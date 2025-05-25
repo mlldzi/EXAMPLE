@@ -13,7 +13,7 @@ services:
       - ./backend/.env
     depends_on:
       - mongo
-    
+
   mongo:
     image: mongo:latest
     container_name: mongodb
@@ -25,6 +25,20 @@ services:
       MONGO_INITDB_DATABASE: fastapi_monolith_db
     command: ["--quiet", "--logpath=/dev/null"]
 
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: react_vite_frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - app
+    environment:
+      - DOCKER_RUN=${DOCKER_RUN}
 
 volumes:
   mongo_data:
