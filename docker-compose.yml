@@ -1,0 +1,31 @@
+services:
+  app:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: fastapi_monolith_app
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/app:/app/app
+      - ./backend/.env:/app/.env
+    env_file:
+      - ./backend/.env
+    depends_on:
+      - mongo
+    
+  mongo:
+    image: mongo:latest
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    environment:
+      MONGO_INITDB_DATABASE: fastapi_monolith_db
+    command: ["--quiet", "--logpath=/dev/null"]
+
+
+volumes:
+  mongo_data:
+    driver: local 

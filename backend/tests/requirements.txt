@@ -1,0 +1,14 @@
+pytest
+pytest-asyncio
+httpx
+pytest-cov
+testcontainers
+motor
+python-jose[cryptography]
+passlib[bcrypt]
+email-validator
+pydantic
+fastapi
+pydantic-settings 
+python-multipart
+trio
