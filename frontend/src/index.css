@@ -1,7 +1,8 @@
 body {
   font-family: sans-serif;
+  line-height: 1.6;
   margin: 0;
-  padding: 20px;
+  padding: 0;
   background-color: #f4f4f4;
   color: #333;
 }
@@ -14,18 +15,21 @@ nav {
 }
 
 nav ul {
-  list-style-type: none;
   padding: 0;
-  margin: 0;
-  display: flex;
+  list-style: none;
+  background: #333;
+  color: #fff;
+  text-align: center;
+  padding: 10px 0;
 }
 
 nav ul li {
-  margin-right: 15px;
+  display: inline;
+  padding: 0 20px;
 }
 
 nav ul li a {
-  color: white;
+  color: #fff;
   text-decoration: none;
 }
 
@@ -34,10 +38,17 @@ nav ul li a:hover {
 }
 
 .container {
-  background-color: white;
+  width: 90%;
+  margin: 20px auto;
+  overflow: hidden;
+  background: #fff;
   padding: 20px;
-  border-radius: 5px;
-  box-shadow: 0 0 10px rgba(0,0,0,0.1);
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+}
+
+h1, h2 {
+  color: #333;
 }
 
 form div {
@@ -58,9 +69,16 @@ form input[type="password"] {
   border-radius: 4px;
 }
 
+input[type="text"] {
+  padding: 8px;
+  margin-right: 4px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
 button {
-  padding: 10px 15px;
-  background-color: #5cb85c;
+  padding: 8px 16px;
+  background: #5cb85c;
   color: white;
   border: none;
   border-radius: 4px;
@@ -68,7 +86,7 @@ button {
 }
 
 button:hover {
-  background-color: #4cae4c;
+  background: #4cae4c;
 }
 
 .error {
@@ -83,4 +101,42 @@ button:hover {
 .auth-links a {
   margin-right: 10px;
   color: #007bff;
+}
+
+ul {
+  list-style: disc;
+  padding-left: 20px;
+}
+
+li {
+  margin-bottom: 8px;
+}
+
+/* Styles for TermItem */
+.term-item {
+  border: 1px solid #ddd;
+  padding: 10px;
+  margin-bottom: 10px;
+  border-radius: 4px;
+  background-color: #f9f9f9;
+}
+
+.term-item h3 {
+  margin-top: 0;
+  margin-bottom: 5px;
+  color: #007bff; /* Пример цвета для заголовка термина */
+}
+
+/* Styles for TermPage */
+.term-section {
+  padding: 15px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background-color: #f9f9f9;
+  margin-bottom: 20px; /* Добавляем отступ снизу */
+}
+
+.term-section h2 {
+    margin-top: 0;
+    color: #0056b3; /* Пример цвета для заголовков секций */
 } 
