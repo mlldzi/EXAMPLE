@@ -41,7 +41,7 @@ async def _create_token_response(user: UserPublic, db: AsyncIOMotorDatabase) -> 
         data={
             "sub": str(user.id),
             "roles": [role.value for role in user.roles]
-        },
+            },
         expires_delta=access_token_expires
     )
     
