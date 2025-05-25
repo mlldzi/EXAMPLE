@@ -4,6 +4,9 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
+import SearchPage from './pages/SearchPage';
+import TermPage from './pages/TermPage';
+import DocumentAnalysisPage from './pages/DocumentAnalysisPage';
 
 // Компонент для защиты роутов
 const ProtectedRoute = ({ children }) => {
@@ -29,6 +32,7 @@ function Navigation() {
     <nav>
       <ul>
         <li><Link to="/">Главная</Link></li>
+        <li><Link to="/analyze-document">Анализ документа</Link></li>
         {accessToken ? (
           <>
             <li><Link to="/dashboard">Панель управления</Link></li>
@@ -52,11 +56,15 @@ function AppContent() {
       <Navigation />
       <div className="container">
         <Routes>
-          <Route path="/" element={<div><h2>Главная страница</h2><p>Добро пожаловать!</p><div className='auth-links'><Link to="/login">Войти</Link> <Link to="/register">Зарегистрироваться</Link></div></div>} />
+          <Route path="/" element={<Navigate to="/search" replace />} />
+
+          <Route path="/search" element={<SearchPage />} />
+          <Route path="/term/:termName" element={<TermPage />} />
+          <Route path="/analyze-document" element={<DocumentAnalysisPage />} />
+
           <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
           <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
           <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
-          <Route path="*" element={<Navigate to="/" replace />} /> {/* Редирект для неизвестных путей */}
         </Routes>
       </div>
     </>

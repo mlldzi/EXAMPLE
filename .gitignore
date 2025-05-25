@@ -112,7 +112,7 @@ celerybeat.pid
 *.sage.py
 
 # Environments
-.env
+# .env
 .venv
 env/
 venv/
@@ -153,3 +153,4 @@ cython_debug/
 
 # Docker
 docker-compose.override.yml
+frontend/package-lock.json

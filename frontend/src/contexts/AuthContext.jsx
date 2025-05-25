@@ -98,7 +98,7 @@ export const AuthProvider = ({ children }) => {
   );
 
   const fetchUser = useCallback(async () => {
-    if (localStorage.getItem('accessToken')) { // Проверяем localStorage напрямую
+    if (localStorage.getItem('accessToken')) {
       try {
         const { data } = await apiClient.get('/users/me');
         setUser(data);
@@ -108,11 +108,12 @@ export const AuthProvider = ({ children }) => {
       }
     }
     setLoading(false);
-  }, [apiClient]); // apiClient теперь стабилен
+  }, [apiClient]);
 
   useEffect(() => {
     fetchUser();
-  }, [fetchUser]);
+    // eslint-disable-next-line
+  }, []); // Только при монтировании
 
   const login = async (email, password) => {
     const response = await apiClient.post('/auth/login', { email, password });
