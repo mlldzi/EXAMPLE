@@ -1,8 +1,6 @@
-import pytest
 import pytest_asyncio
 import os
 import sys
-import asyncio
 import httpx
 from typing import AsyncGenerator
 import uuid

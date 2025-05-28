@@ -1,14 +1,6 @@
 import pytest
-from httpx import AsyncClient
-from motor.motor_asyncio import AsyncIOMotorDatabase
 import uuid
 from uuid import uuid4
-
-# Импорт моделей
-from app.models.user import UserCreate, UserPublic, UserUpdate, UserRole
-
-# Импорт CRUD операций
-from app.crud.user import CRUDUser
 
 # Отмечаем все тесты как асинхронные
 pytestmark = pytest.mark.asyncio

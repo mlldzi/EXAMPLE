@@ -2,9 +2,8 @@ import pytest
 from httpx import AsyncClient
 from uuid import uuid4
 from datetime import datetime, timezone
-from pydantic import HttpUrl
 
-from app.models.document import DocumentCreate, DocumentUpdate, DocumentStatus
+from app.models.document import DocumentStatus
 
 # Предполагаем, что у вас есть фикстуры app_client и auth_headers в conftest.py
 

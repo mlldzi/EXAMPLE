@@ -1,7 +1,6 @@
 import pytest
-import asyncio
-from uuid import uuid4, UUID
-from datetime import datetime, timezone
+from uuid import uuid4
+from datetime import timezone
 
 from motor.motor_asyncio import AsyncIOMotorDatabase
 

@@ -2,10 +2,6 @@ import pytest
 from httpx import AsyncClient
 from uuid import uuid4, UUID
 from datetime import datetime, timezone
-from typing import Any
-
-from app.models.term_document import TermDocumentRelationCreate, TermDocumentRelationUpdate
-from app.crud.term_document import CRUDTermDocument
 
 # Предполагаем, что у вас есть фикстуры app_client и auth_headers в conftest.py
 

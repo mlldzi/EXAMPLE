@@ -10,7 +10,6 @@ from app.models.term_document import (
     TermDocumentRelation, 
     TermDocumentRelationCreate,
     TermDocumentRelationUpdate,
-    ConflictStatus,
     ConflictDetail,
     TermConflictReportEntry
 )

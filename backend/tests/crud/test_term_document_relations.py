@@ -1,16 +1,11 @@
 import pytest
-import asyncio
-from uuid import uuid4, UUID
-from datetime import datetime, timezone
+from uuid import uuid4
+from datetime import timezone
 
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.crud.term_document import CRUDTermDocument
 from app.models.term_document import TermDocumentRelationCreate, TermDocumentRelationUpdate, TermDocumentRelation, ConflictStatus
-from app.crud.term import CRUDTerm
-from app.models.term import TermCreate
-from app.crud.document import CRUDDocument
-from app.models.document import DocumentCreate
 
 # Предполагаем, что у вас есть фикстура mongo_db в conftest.py
 

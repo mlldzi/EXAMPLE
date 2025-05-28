@@ -1,4 +1,4 @@
-from uuid import UUID, uuid4
+from uuid import UUID
 from typing import List, Optional
 from datetime import datetime
 from pydantic import Field
