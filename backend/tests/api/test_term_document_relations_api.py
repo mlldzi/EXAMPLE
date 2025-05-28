@@ -1,9 +1,11 @@
 import pytest
 from httpx import AsyncClient
-from uuid import uuid4
+from uuid import uuid4, UUID
 from datetime import datetime, timezone
+from typing import Any
 
 from app.models.term_document import TermDocumentRelationCreate, TermDocumentRelationUpdate
+from app.crud.term_document import CRUDTermDocument
 
 # Предполагаем, что у вас есть фикстуры app_client и auth_headers в conftest.py
 
@@ -248,4 +250,180 @@ async def test_delete_relation_api(app_client: AsyncClient, auth_headers: dict):
         headers=auth_headers
     )
     
-    assert get_response.status_code == 404 # Not Found 
+    assert get_response.status_code == 404 # Not Found
+
+@pytest.mark.asyncio
+async def test_get_term_conflicts_report_api(app_client: AsyncClient, auth_headers: dict):
+    """Тест получения отчета о конфликтах для термина через API."""
+    # Создаем тестовый термин
+    term = await create_test_term(app_client, auth_headers)
+    term_id = term["id"]
+
+    # Создаем два документа с разными определениями для одного термина
+    doc1 = await create_test_document(app_client, auth_headers)
+    doc2 = await create_test_document(app_client, auth_headers)
+    
+    definition1 = "Определение термина в документе 1"
+    definition2 = "Другое определение термина в документе 2"
+
+    # Создаем первую связь
+    relation_data1 = {
+        "term_id": term_id,
+        "document_id": doc1["id"],
+        "term_definition_in_document": definition1
+    }
+    create_response1 = await app_client.post(
+        "/api/v1/term_document_relations/",
+        json=relation_data1,
+        headers=auth_headers
+    )
+    assert create_response1.status_code == 201
+
+    # Создаем вторую связь с другим определением
+    relation_data2 = {
+        "term_id": term_id,
+        "document_id": doc2["id"],
+        "term_definition_in_document": definition2
+    }
+    create_response2 = await app_client.post(
+        "/api/v1/term_document_relations/",
+        json=relation_data2,
+        headers=auth_headers
+    )
+    assert create_response2.status_code == 201
+
+    # Получаем отчет о конфликтах для термина
+    conflicts_response = await app_client.get(
+        f"/api/v1/term_document_relations/conflicts/{term_id}",
+        headers=auth_headers
+    )
+    
+    assert conflicts_response.status_code == 200
+    conflicts = conflicts_response.json()
+    
+    # Проверяем, что отчет содержит ожидаемый конфликт
+    assert isinstance(conflicts, list)
+    assert len(conflicts) == 1 # Ожидаем один конфликт между двумя определениями
+    
+    conflict = conflicts[0]
+    assert conflict["definition1"] in [definition1, definition2]
+    assert conflict["definition2"] in [definition1, definition2]
+    assert conflict["definition1"] != conflict["definition2"]
+    
+    # Проверяем, что в отчете указаны соответствующие документы
+    docs1_ids = [UUID(d) for d in conflict["documents1"]]
+    docs2_ids = [UUID(d) for d in conflict["documents2"]]
+    
+    assert UUID(doc1["id"]) in docs1_ids or UUID(doc1["id"]) in docs2_ids
+    assert UUID(doc2["id"]) in docs1_ids or UUID(doc2["id"]) in docs2_ids
+    
+    # Проверяем отсутствие конфликтов, если определения одинаковые (опционально, можно добавить отдельный тест)
+    relation_data3 = {
+        "term_id": term_id,
+        "document_id": doc1["id"],
+        "term_definition_in_document": definition1 # То же определение
+    }
+    # Обновляем первую связь с тем же определением
+    # update_response = await app_client.put(
+    #     f"/api/v1/term_document_relations/{create_response1.json()['id']}",
+    #     json=relation_data3,
+    #     headers=auth_headers
+    # )
+    # assert update_response.status_code == 200
+    
+    # # Снова получаем отчет
+    # conflicts_response_after_update = await app_client.get(
+    #     f"/api/v1/term_document_relations/conflicts/{term_id}",
+    #     headers=auth_headers
+    # )
+    # assert conflicts_response_after_update.status_code == 200
+    # conflicts_after_update = conflicts_response_after_update.json()
+    # assert len(conflicts_after_update) == 0 # Теперь конфликтов быть не должно 
+
+@pytest.mark.asyncio
+async def test_get_all_conflicts_report_api(app_client: AsyncClient, auth_headers: dict):
+    """Тест получения полного отчета обо всех конфликтах через API."""
+    # Создаем два тестовых термина
+    term1 = await create_test_term(app_client, auth_headers)
+    term1_id = term1["id"]
+
+    term2 = await create_test_term(app_client, auth_headers)
+    term2_id = term2["id"]
+
+    # Создаем несколько документов
+    doc1 = await create_test_document(app_client, auth_headers)
+    doc2 = await create_test_document(app_client, auth_headers)
+    doc3 = await create_test_document(app_client, auth_headers)
+    doc4 = await create_test_document(app_client, auth_headers)
+
+    # Создаем связи, чтобы у term1 были конфликты, а у term2 - нет
+    # Связи для term1 (конфликт)
+    await app_client.post(
+        "/api/v1/term_document_relations/",
+        json={
+            "term_id": term1_id,
+            "document_id": doc1["id"],
+            "term_definition_in_document": "Определение 1 для term1"
+        },
+        headers=auth_headers
+    )
+    await app_client.post(
+        "/api/v1/term_document_relations/",
+        json={
+            "term_id": term1_id,
+            "document_id": doc2["id"],
+            "term_definition_in_document": "Определение 2 для term1 (конфликт)"
+        },
+        headers=auth_headers
+    )
+
+    # Связи для term2 (без конфликта)
+    await app_client.post(
+        "/api/v1/term_document_relations/",
+        json={
+            "term_id": term2_id,
+            "document_id": doc3["id"],
+            "term_definition_in_document": "Определение для term2"
+        },
+        headers=auth_headers
+    )
+    await app_client.post(
+        "/api/v1/term_document_relations/",
+        json={
+            "term_id": term2_id,
+            "document_id": doc4["id"],
+            "term_definition_in_document": "Определение для term2" # То же определение
+        },
+        headers=auth_headers
+    )
+
+    # Получаем полный отчет о конфликтах
+    response = await app_client.get(
+        "/api/v1/term_document_relations/conflicts",
+        headers=auth_headers
+    )
+
+    # Печатаем тело ответа при ошибке 422 для диагностики
+    if response.status_code == 422:
+        print("Response body on 422 error:", response.json())
+
+    assert response.status_code == 200
+    report = response.json()
+
+    assert isinstance(report, list)
+    
+    # Ожидаем, что в отчете будет информация только о term1
+    assert len(report) == 1
+    
+    conflict_entry = report[0]
+    assert conflict_entry["term_id"] == term1_id
+    assert "conflicts" in conflict_entry
+    
+    conflicts_list = conflict_entry["conflicts"]
+    assert isinstance(conflicts_list, list)
+    assert len(conflicts_list) == 1 # Ожидаем один конфликт между двумя определениями для term1
+
+    conflict = conflicts_list[0]
+    definitions = [conflict["definition1"], conflict["definition2"]]
+    assert "Определение 1 для term1" in definitions
+    assert "Определение 2 для term1 (конфликт)" in definitions 

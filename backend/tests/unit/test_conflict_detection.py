@@ -55,13 +55,14 @@ async def test_check_for_conflicts_with_conflicts(db: AsyncIOMotorDatabase):
     # Проверяем, что документы с одинаковыми определениями сгруппированы
     for conflict in conflicts:
         if conflict["definition1"] == "Определение А":
-            assert doc_id_1 in conflict["documents1"] or doc_id_3 in conflict["documents1"]
+            # Проверяем наличие строковых представлений UUID документов
+            assert str(doc_id_1) in conflict["documents1"] or str(doc_id_3) in conflict["documents1"]
             if "Определение Б" in conflict["definition2"]:
-                assert doc_id_2 in conflict["documents2"]
+                assert str(doc_id_2) in conflict["documents2"]
         elif conflict["definition1"] == "Определение Б":
-             assert doc_id_2 in conflict["documents1"]
+             assert str(doc_id_2) in conflict["documents1"]
              if "Определение А" in conflict["definition2"]:
-                 assert doc_id_1 in conflict["documents2"] or doc_id_3 in conflict["documents2"]
+                 assert str(doc_id_1) in conflict["documents2"] or str(doc_id_3) in conflict["documents2"]
 
 @pytest.mark.asyncio
 async def test_update_conflict_status_no_conflicts(db: AsyncIOMotorDatabase):

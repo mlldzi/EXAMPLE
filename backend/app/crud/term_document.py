@@ -20,6 +20,7 @@ class CRUDTermDocument:
         """Инициализирует класс с экземпляром базы данных."""
         self.db = db
         self.collection = db.term_document_relations
+        self.terms_collection = db.terms # Добавляем доступ к коллекции терминов
         
     async def create(self, *, relation_in: TermDocumentRelationCreate) -> TermDocumentRelation:
         """
@@ -147,6 +148,55 @@ class CRUDTermDocument:
             relations.append(TermDocumentRelation(**relation_data))
         return relations
     
+    async def get_term_usage_statistics(self) -> List[Dict[str, Any]]:
+        """
+        Получает статистику использования терминов (количество документов, в которых встречается каждый термин).
+        Включает все термины, даже если у них 0 связанных документов.
+
+        Returns:
+            Список словарей с term_id, term_name и document_count.
+        """
+        pipeline = [
+            {  # Шаг 1: Получить все термины и их связи (Left Join)
+                '$lookup': {
+                    'from': 'term_document_relations',  # Коллекция связей
+                    'localField': 'id',  # Поле в коллекции 'terms'
+                    'foreignField': 'term_id',  # Поле в коллекции 'term_document_relations'
+                    'as': 'relations'  # Название нового поля для связей
+                }
+            },
+            {  # Шаг 2: Развернуть массив связей (включая термины без связей)
+                '$unwind': {
+                    'path': '$relations',
+                    'preserveNullAndEmptyArrays': True
+                }
+            },
+            {  # Шаг 3: Сгруппировать по ID и имени термина и собрать уникальные document_id
+                 '$group': {
+                     '_id': '$_id', # Группируем по ID термина (из коллекции terms)
+                     'term_name': { '$first': '$name' }, # Берем имя термина
+                     'document_ids': { '$addToSet': '$relations.document_id' } # Собираем уникальные document_id
+                 }
+             },
+            {  # Шаг 4: Сформировать финальный результат
+                '$project': {
+                    '_id': 0,
+                    'term_id': '$_id',
+                    'term_name': '$term_name', 
+                    'document_count': { '$size': '$document_ids' } # Подсчитываем количество уникальных document_id
+                }
+            }
+        ]
+
+        # Выполняем агрегацию на коллекции терминов
+        cursor = self.terms_collection.aggregate(pipeline)
+        results = []
+        async for doc in cursor:
+            # MongoDB возвращает UUID как Binary, преобразуем в str для консистентности с моделями
+            doc["term_id"] = str(doc["term_id"])
+            results.append(doc)
+        return results
+    
     async def update(
         self, *, relation_id: UUID, relation_update: TermDocumentRelationUpdate, user_id: Optional[UUID] = None
     ) -> Optional[TermDocumentRelation]:
@@ -230,6 +280,32 @@ class CRUDTermDocument:
         })
         return result.deleted_count > 0
     
+    async def delete_by_term_id(self, *, term_id: UUID) -> int:
+        """
+        Удаляет все связи для заданного термина.
+
+        Args:
+            term_id: ID термина
+
+        Returns:
+            Количество удаленных связей.
+        """
+        result = await self.collection.delete_many({"term_id": term_id})
+        return result.deleted_count
+
+    async def delete_by_document_id(self, *, document_id: UUID) -> int:
+        """
+        Удаляет все связи для заданного документа.
+
+        Args:
+            document_id: ID документа
+
+        Returns:
+            Количество удаленных связей.
+        """
+        result = await self.collection.delete_many({"document_id": document_id})
+        return result.deleted_count
+    
     async def check_for_conflicts(self, *, term_id: UUID) -> List[Dict[str, Any]]:
         """
         Проверяет наличие конфликтов в определениях термина в разных документах.
@@ -276,6 +352,11 @@ class CRUDTermDocument:
                     "documents2": docs2
                 })
         
+        # Преобразуем UUID документов в строки для соответствия Pydantic моделям
+        for conflict in conflicts:
+            conflict["documents1"] = [str(doc_id) for doc_id in conflict["documents1"]]
+            conflict["documents2"] = [str(doc_id) for doc_id in conflict["documents2"]]
+            
         return conflicts
     
     async def update_conflict_status(self, *, term_id: UUID) -> bool:
@@ -318,4 +399,35 @@ class CRUDTermDocument:
                 }
             }
         )
-        return True 
+        return True
+
+    async def get_terms_with_conflicts(self) -> List[UUID]:
+        """
+        Находит все term_id, у которых есть конфликты определений в разных документах.
+
+        Returns:
+            Список UUID терминов с конфликтами.
+        """
+        pipeline = [
+            {
+                "$group": {
+                    "_id": "$term_id",
+                    "distinct_definitions": {"$addToSet": "$term_definition_in_document"}
+                }
+            },
+            {
+                "$match": {
+                    "$expr": { "$gt": [{ "$size": "$distinct_definitions" }, 1] }
+                }
+            },
+            {
+                "$project": {
+                    "_id": 0,
+                    "term_id": "$_id"
+                }
+            }
+        ]
+        
+        cursor = self.collection.aggregate(pipeline)
+        term_ids_with_conflicts = [doc["term_id"] for doc in await cursor.to_list(None)]
+        return term_ids_with_conflicts 

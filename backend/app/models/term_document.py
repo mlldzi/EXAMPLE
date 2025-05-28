@@ -69,4 +69,21 @@ class ConflictReport(MongoBaseModel):
     term_name: str
     conflicts: List[Dict[str, Any]]
     conflict_count: int
-    generated_at: datetime = Field(default_factory=datetime.now) 
+    generated_at: datetime = Field(default_factory=datetime.now)
+
+# Модель для статистики использования терминов
+class TermUsageStatistic(MongoBaseModel):
+    term_id: str = Field(..., description="ID термина (строка)")
+    document_count: int = Field(..., description="Количество документов, в которых встречается термин")
+
+# Модель для детализации одного конфликта в отчете
+class ConflictDetail(MongoBaseModel):
+    definition1: str = Field(..., description="Первое конфликтующее определение")
+    documents1: List[str] = Field(..., description="Список ID документов (строки), содержащих определение 1")
+    definition2: str = Field(..., description="Второе конфликтующее определение")
+    documents2: List[str] = Field(..., description="Список ID документов (строки), содержащих определение 2")
+
+# Модель для элемента полного отчета о конфликтах (для одного термина)
+class TermConflictReportEntry(MongoBaseModel):
+    term_id: str = Field(..., description="ID термина с конфликтами (строка)")
+    conflicts: List[ConflictDetail] = Field(..., description="Список деталей конфликтов для данного термина") 

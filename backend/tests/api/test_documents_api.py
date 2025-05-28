@@ -192,3 +192,118 @@ async def test_delete_document_api(app_client: AsyncClient, auth_headers: dict):
     )
     
     assert get_response.status_code == 404 # Not Found 
+
+# Вспомогательные функции для тестов связанных сущностей (можно перенести в conftest.py)
+async def create_test_term(client: AsyncClient, headers: dict):
+    term_data = {"name": f"Тестовый термин для связей {uuid4()}", "definition": "Определение для связи"}
+    response = await client.post("/api/v1/terms/", json=term_data, headers=headers)
+    assert response.status_code == 201
+    return response.json()
+
+async def create_test_relation(
+    client: AsyncClient, 
+    headers: dict, 
+    term_id: str, 
+    document_id: str,
+    definition: str = "Тестовое определение в документе"
+):
+    relation_data = {
+        "term_id": term_id,
+        "document_id": document_id,
+        "term_definition_in_document": definition
+    }
+    response = await client.post(
+        "/api/v1/term_document_relations/",
+        json=relation_data,
+        headers=headers
+    )
+    assert response.status_code == 201
+    return response.json()
+
+@pytest.mark.asyncio
+async def test_get_terms_for_document_api(app_client: AsyncClient, auth_headers: dict):
+    """Тест получения списка терминов для документа через API."""
+    # Создаем тестовый документ
+    document = await app_client.post(
+        "/api/v1/documents/",
+        json={
+            "title": "Документ со связанными терминами",
+            "document_number": f"ДСТ-{uuid4()}",
+            "approval_date": datetime.now(timezone.utc).isoformat()
+        },
+        headers=auth_headers
+    )
+    assert document.status_code == 201
+    doc_id = document.json()["id"]
+
+    # Создаем несколько тестовых терминов
+    term1 = await create_test_term(app_client, auth_headers)
+    term2 = await create_test_term(app_client, auth_headers)
+    term3 = await create_test_term(app_client, auth_headers) # Не будем связывать
+
+    # Создаем связи термин-документ
+    await create_test_relation(app_client, auth_headers, term1["id"], doc_id)
+    await create_test_relation(app_client, auth_headers, term2["id"], doc_id)
+
+    # Получаем список терминов для документа
+    response = await app_client.get(
+        f"/api/v1/documents/{doc_id}/terms",
+        headers=auth_headers
+    )
+
+    assert response.status_code == 200
+    terms = response.json()
+
+    assert isinstance(terms, list)
+    assert len(terms) == 2 # Ожидаем 2 связанных термина
+
+    # Проверяем, что возвращены правильные термины
+    returned_term_ids = [t["id"] for t in terms]
+    assert term1["id"] in returned_term_ids
+    assert term2["id"] in returned_term_ids
+    assert term3["id"] not in returned_term_ids
+
+@pytest.mark.asyncio
+async def test_delete_document_deletes_relations_api(app_client: AsyncClient, auth_headers: dict):
+    """Тест: при удалении документа удаляются связанные с ним связи термин-документ."""
+    # Создаем тестовый документ
+    document = await app_client.post(
+        "/api/v1/documents/",
+        json={
+            "title": "Документ для удаления со связями",
+            "document_number": f"ДДУ-{uuid4()}",
+            "approval_date": datetime.now(timezone.utc).isoformat()
+        },
+        headers=auth_headers
+    )
+    assert document.status_code == 201
+    doc_id = document.json()["id"]
+
+    # Создаем тестовый термин
+    term = await create_test_term(app_client, auth_headers)
+    term_id = term["id"]
+
+    # Создаем связь термин-документ
+    relation = await create_test_relation(app_client, auth_headers, term_id, doc_id)
+    relation_id = relation["id"]
+
+    # Проверяем, что связь существует
+    get_relation_response = await app_client.get(
+        f"/api/v1/term_document_relations/{relation_id}",
+        headers=auth_headers
+    )
+    assert get_relation_response.status_code == 200
+
+    # Удаляем документ
+    delete_document_response = await app_client.delete(
+        f"/api/v1/documents/{doc_id}",
+        headers=auth_headers
+    )
+    assert delete_document_response.status_code == 200
+
+    # Проверяем, что связь была удалена
+    get_relation_after_delete_response = await app_client.get(
+        f"/api/v1/term_document_relations/{relation_id}",
+        headers=auth_headers
+    )
+    assert get_relation_after_delete_response.status_code == 404 # Связь не найдена 

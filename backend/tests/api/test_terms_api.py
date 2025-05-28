@@ -1,6 +1,7 @@
 import pytest
 from httpx import AsyncClient
 from uuid import uuid4
+from datetime import datetime, timezone
 
 from app.models.term import TermCreate, TermUpdate
 
@@ -183,3 +184,213 @@ async def test_delete_term_api(app_client: AsyncClient, auth_headers: dict):
     )
     
     assert get_response.status_code == 404 # Not Found 
+
+# Вспомогательные функции для тестов связанных сущностей (можно перенести в conftest.py)
+async def create_test_document(client: AsyncClient, headers: dict):
+    doc_data = {
+        "title": f"Тестовый документ для связей {uuid4()}",
+        "document_number": f"ТД-{uuid4()}",
+        "approval_date": datetime.now(timezone.utc).isoformat()
+    }
+    response = await client.post("/api/v1/documents/", json=doc_data, headers=headers)
+    assert response.status_code == 201
+    return response.json()
+
+async def create_test_relation(
+    client: AsyncClient, 
+    headers: dict, 
+    term_id: str, 
+    document_id: str,
+    definition: str = "Тестовое определение в документе"
+):
+    relation_data = {
+        "term_id": term_id,
+        "document_id": document_id,
+        "term_definition_in_document": definition
+    }
+    response = await client.post(
+        "/api/v1/term_document_relations/",
+        json=relation_data,
+        headers=headers
+    )
+    assert response.status_code == 201
+    return response.json()
+
+
+@pytest.mark.asyncio
+async def test_get_documents_for_term_api(app_client: AsyncClient, auth_headers: dict):
+    """Тест получения списка документов для термина через API."""
+    # Создаем тестовый термин
+    term = await app_client.post(
+        "/api/v1/terms/",
+        json={
+            "name": "Термин со связанными документами",
+            "definition": "Определение"
+        },
+        headers=auth_headers
+    )
+    assert term.status_code == 201
+    term_id = term.json()["id"]
+
+    # Создаем несколько тестовых документов
+    doc1 = await create_test_document(app_client, auth_headers)
+    doc2 = await create_test_document(app_client, auth_headers)
+    doc3 = await create_test_document(app_client, auth_headers) # Не будем связывать
+
+    # Создаем связи термин-документ
+    await create_test_relation(app_client, auth_headers, term_id, doc1["id"])
+    await create_test_relation(app_client, auth_headers, term_id, doc2["id"])
+
+    # Получаем список документов для термина
+    response = await app_client.get(
+        f"/api/v1/terms/{term_id}/documents",
+        headers=auth_headers
+    )
+
+    assert response.status_code == 200
+    documents = response.json()
+
+    assert isinstance(documents, list)
+    assert len(documents) == 2 # Ожидаем 2 связанных документа
+
+    # Проверяем, что возвращены правильные документы
+    returned_doc_ids = [d["id"] for d in documents]
+    assert doc1["id"] in returned_doc_ids
+    assert doc2["id"] in returned_doc_ids
+    assert doc3["id"] not in returned_doc_ids
+
+@pytest.mark.asyncio
+async def test_delete_term_deletes_relations_api(app_client: AsyncClient, auth_headers: dict):
+    """Тест: при удалении термина удаляются связанные с ним связи термин-документ."""
+    # Создаем тестовый термин
+    term = await app_client.post(
+        "/api/v1/terms/",
+        json={
+            "name": "Термин для удаления со связями",
+            "definition": "Определение для удаления связей"
+        },
+        headers=auth_headers
+    )
+    assert term.status_code == 201
+    term_id = term.json()["id"]
+
+    # Создаем тестовый документ
+    document = await create_test_document(app_client, auth_headers)
+    doc_id = document["id"]
+
+    # Создаем связь термин-документ
+    relation = await create_test_relation(app_client, auth_headers, term_id, doc_id)
+    relation_id = relation["id"]
+
+    # Проверяем, что связь существует
+    get_relation_response = await app_client.get(
+        f"/api/v1/term_document_relations/{relation_id}",
+        headers=auth_headers
+    )
+    assert get_relation_response.status_code == 200
+
+    # Удаляем термин
+    delete_term_response = await app_client.delete(
+        f"/api/v1/terms/{term_id}",
+        headers=auth_headers
+    )
+    assert delete_term_response.status_code == 200
+
+    # Проверяем, что связь была удалена
+    get_relation_after_delete_response = await app_client.get(
+        f"/api/v1/term_document_relations/{relation_id}",
+        headers=auth_headers
+    )
+    assert get_relation_after_delete_response.status_code == 404 # Связь не найдена 
+
+@pytest.mark.asyncio
+async def test_get_terms_statistics_api(app_client: AsyncClient, auth_headers: dict):
+    """Тест получения статистики использования терминов через API."""
+    # Создаем тестовый термин
+    term_data = {
+        "name": "Термин для статистики",
+        "definition": "Определение для статистики"
+    }
+    create_term_response = await app_client.post(
+        "/api/v1/terms/",
+        json=term_data,
+        headers=auth_headers
+    )
+    assert create_term_response.status_code == 201
+    term_id = create_term_response.json()["id"]
+
+    # Создаем тестовый документ
+    doc = await create_test_document(app_client, auth_headers)
+
+    # Создаем связь между термином и документом
+    await create_test_relation(app_client, auth_headers, term_id, doc["id"])
+
+    # Получаем статистику
+    response = await app_client.get(
+        "/api/v1/terms/statistics",
+        headers=auth_headers
+    )
+
+    assert response.status_code == 200
+    statistics = response.json()
+
+    # Ожидаем, что статистика будет содержать наш термин с count = 1
+    assert isinstance(statistics, list)
+    # Находим нашу статистику по term_id
+    term_stat = next((item for item in statistics if item["term_id"] == term_id), None)
+
+    assert term_stat is not None
+    assert term_stat["document_count"] == 1
+
+@pytest.mark.asyncio
+async def test_get_terms_statistics_excludes_unrelated(app_client: AsyncClient, auth_headers: dict):
+    """Тест, что статистика использования терминов включает термины без связей с count 0."""
+    # Создаем тестовый термин, который будет иметь связь
+    term_with_relation_data = {
+        "name": "Термин со связью для статистики",
+        "definition": "Определение"
+    }
+    create_term_with_relation_response = await app_client.post(
+        "/api/v1/terms/",
+        json=term_with_relation_data,
+        headers=auth_headers
+    )
+    assert create_term_with_relation_response.status_code == 201
+    term_with_relation_id = create_term_with_relation_response.json()["id"]
+
+    # Создаем тестовый документ и связь
+    doc = await create_test_document(app_client, auth_headers)
+    await create_test_relation(app_client, auth_headers, term_with_relation_id, doc["id"])
+
+    # Создаем тестовый термин, который не будет иметь связей
+    term_without_relation_data = {
+        "name": "Термин без связи для статистики",
+        "definition": "Определение"
+    }
+    create_term_without_relation_response = await app_client.post(
+        "/api/v1/terms/",
+        json=term_without_relation_data,
+        headers=auth_headers
+    )
+    assert create_term_without_relation_response.status_code == 201
+    term_without_relation_id = create_term_without_relation_response.json()["id"]
+
+    # Получаем статистику
+    response = await app_client.get(
+        "/api/v1/terms/statistics",
+        headers=auth_headers
+    )
+
+    assert response.status_code == 200
+    statistics = response.json()
+
+    # Проверяем, что статистика включает оба термина
+    term_with_relation_stat = next((item for item in statistics if item["term_id"] == term_with_relation_id), None)
+    term_without_relation_stat = next((item for item in statistics if item["term_id"] == term_without_relation_id), None)
+
+    assert term_with_relation_stat is not None
+    assert term_without_relation_stat is not None
+
+    # Проверяем количество документов
+    assert term_with_relation_stat["document_count"] > 0  # У этого термина есть связь
+    assert term_without_relation_stat["document_count"] == 0 # У этого термина нет связей 

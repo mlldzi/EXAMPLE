@@ -76,7 +76,15 @@ async def update_document(
     
     # После обновления документа, возможно, потребуется пересчитать статусы конфликтов для связанных связей
     # Это может быть сложная операция, возможно, ее стоит вынести в отдельную фоновую задачу
-    # await crud.term_document.update_conflict_status_for_document_relations(db, doc_id=doc_id)
+    # Получаем ID терминов, связанных с этим документом
+    term_document_crud = crud.CRUDTermDocument(db)
+    relations = await term_document_crud.get_by_document_id(document_id=doc_id)
+    term_ids = list(set([str(relation.term_id) for relation in relations])) # Используем set для уникальных ID и конвертируем в str для безопасности сравнения
+
+    # Обновляем статус конфликта для каждого связанного термина
+    for term_id_str in term_ids:
+        term_id = UUID(term_id_str)
+        await term_document_crud.update_conflict_status(term_id=term_id)
 
     return updated_document
 
@@ -93,8 +101,46 @@ async def delete_document(
         raise HTTPException(status_code=404, detail="Документ не найден")
         
     # При удалении документа, также нужно удалить все связанные с ним связи термин-документ
-    # await crud.term_document.delete_by_document_id(db, doc_id=doc_id)
+    term_document_crud = crud.CRUDTermDocument(db)
+    # Получаем ID терминов, связанных с этим документом, ДО удаления связей
+    relations = await term_document_crud.get_by_document_id(document_id=doc_id)
+    term_ids = list(set([str(relation.term_id) for relation in relations])) # Используем set для уникальных ID
 
+    # Удаляем связанные связи термин-документ
+    await term_document_crud.delete_by_document_id(document_id=doc_id)
+
+    # Удаляем сам документ
     delete_result = await document_crud.delete(doc_id=doc_id)
     
+    # После удаления документа и связей, возможно, потребуется пересчитать статусы конфликтов
+    # для терминов, которые были связаны с этим документом
+    for term_id_str in term_ids:
+         await term_document_crud.update_conflict_status(term_id=UUID(term_id_str))
+
+    
     return {"success": delete_result, "id": doc_id}
+
+@router.get("/{doc_id}/terms", response_model=List[crud.term.Term])
+async def read_terms_for_document(
+    doc_id: UUID,
+    db: AsyncIOMotorDatabase = Depends(deps.get_db),
+    current_user: UserPublic = Depends(deps.get_current_user),
+) -> Any:
+    """Получить список терминов, связанных с документом."""
+    term_document_crud = crud.CRUDTermDocument(db)
+    term_crud = crud.CRUDTerm(db)
+    
+    # Получаем все связи для данного документа
+    relations = await term_document_crud.get_by_document_id(document_id=doc_id)
+    
+    # Извлекаем ID терминов из связей
+    term_ids = [relation.term_id for relation in relations]
+    
+    # Получаем полную информацию о терминах по их ID
+    terms = []
+    for term_id in term_ids:
+        term = await term_crud.get_by_id(term_id=term_id)
+        if term:
+            terms.append(term)
+            
+    return terms

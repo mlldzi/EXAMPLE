@@ -9,11 +9,57 @@ from app.api.v1 import deps
 from app.models.term_document import (
     TermDocumentRelation, 
     TermDocumentRelationCreate,
-    TermDocumentRelationUpdate
+    TermDocumentRelationUpdate,
+    ConflictStatus,
+    ConflictDetail,
+    TermConflictReportEntry
 )
 from app.models.user import UserPublic
 
 router = APIRouter()
+
+@router.get("/conflicts/{term_id}", response_model=List[ConflictDetail])
+async def get_term_conflicts_report(
+    term_id: UUID,
+    db: AsyncIOMotorDatabase = Depends(deps.get_db),
+    current_user: UserPublic = Depends(deps.get_current_user),
+) -> Any:
+    """Получить отчет о конфликтах определений для заданного термина."""
+    term_document_crud = crud.CRUDTermDocument(db)
+    
+    # Проверяем наличие термина
+    term = await crud.CRUDTerm(db).get_by_id(term_id=term_id)
+    if not term:
+        raise HTTPException(status_code=404, detail="Термин не найден")
+        
+    conflicts = await term_document_crud.check_for_conflicts(term_id=term_id)
+    
+    return conflicts
+
+@router.get("/conflicts", response_model=List[TermConflictReportEntry])
+async def get_all_conflicts_report(
+    db: AsyncIOMotorDatabase = Depends(deps.get_db),
+    current_user: UserPublic = Depends(deps.get_current_user),
+) -> Any:
+    """Получить полный отчет обо всех конфликтах определений терминов."""
+    term_document_crud = crud.CRUDTermDocument(db)
+    
+    # Получаем ID всех терминов, у которых есть конфликты
+    term_ids_with_conflicts = await term_document_crud.get_terms_with_conflicts()
+    
+    all_conflicts_report = []
+    
+    # Для каждого термина с конфликтами получаем детальный отчет
+    for term_id in term_ids_with_conflicts:
+        conflicts_for_term = await term_document_crud.check_for_conflicts(term_id=term_id)
+        if conflicts_for_term:
+            # Добавляем отчет по этому термину
+            all_conflicts_report.append({
+                "term_id": str(term_id),
+                "conflicts": conflicts_for_term
+            })
+            
+    return all_conflicts_report
 
 @router.post("/", response_model=TermDocumentRelation, status_code=201)
 async def create_relation(
