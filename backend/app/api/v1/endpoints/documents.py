@@ -6,7 +6,7 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app import crud
 from app.api.v1 import deps
-from app.models.document import Document, DocumentCreate, DocumentUpdate
+from app.models.document import Document, DocumentCreate, DocumentUpdate, DocumentPublic
 from app.models.user import UserPublic
 
 router = APIRouter()
@@ -27,7 +27,7 @@ async def create_document(
     document = await document_crud.create(doc_in=document_in, user_id=current_user.id)
     return document
 
-@router.get("/{doc_id}", response_model=Document)
+@router.get("/{doc_id}", response_model=DocumentPublic)
 async def read_document(
     doc_id: UUID,
     db: AsyncIOMotorDatabase = Depends(deps.get_db),
@@ -38,7 +38,18 @@ async def read_document(
     document = await document_crud.get_by_id(doc_id=doc_id)
     if not document:
         raise HTTPException(status_code=404, detail="Документ не найден")
-    return document
+        
+    # Явно преобразуем поля в строки для соответствия DocumentPublic
+    document_dict = document.model_dump()
+    document_dict['approval_date'] = str(document.approval_date) if document.approval_date else None
+    document_dict['document_url'] = str(document.document_url) if document.document_url else None
+    document_dict['created_at'] = str(document.created_at) if document.created_at else None
+    document_dict['updated_at'] = str(document.updated_at) if document.updated_at else None
+    # Убедимся, что ID в строковом формате, если он UUID
+    if isinstance(document_dict.get('id'), UUID):
+         document_dict['id'] = str(document_dict['id'])
+
+    return DocumentPublic(**document_dict)
 
 @router.get("/", response_model=List[Document])
 async def read_documents(
@@ -141,6 +152,7 @@ async def read_terms_for_document(
     for term_id in term_ids:
         term = await term_crud.get_by_id(term_id=term_id)
         if term:
+            # print(f'DEBUG: Fetched term in read_terms_for_document: {term}') # Временное логирование
             terms.append(term)
             
     return terms

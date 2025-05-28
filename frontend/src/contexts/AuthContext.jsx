@@ -1,9 +1,11 @@
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
+  const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [accessToken, setAccessTokenState] = useState(localStorage.getItem('accessToken'));
   const [refreshToken, setRefreshTokenState] = useState(localStorage.getItem('refreshToken'));
@@ -140,10 +142,10 @@ export const AuthProvider = ({ children }) => {
       }
     }
     setUser(null);
-    setTokens(null, null); // Очистка токенов
-    setFailedQueue([]); // Очищаем очередь при выходе
-    // Можно добавить navigate('/login') здесь
-  }, [apiClient]); // apiClient стабилен
+    setTokens(null, null); 
+    setFailedQueue([]); 
+    navigate('/login'); 
+  }, [apiClient, navigate]); 
 
   return (
     <AuthContext.Provider value={{ user, accessToken, login, register, logout, apiClient, loading }}>

@@ -87,21 +87,30 @@ class CRUDTerm:
         return None
     
     async def get_multiple(
-        self, *, skip: int = 0, limit: int = 100, query: Dict[str, Any] = None
+        self, *, skip: int = 0, limit: int = 100, query: str = None
     ) -> List[Term]:
         """
-        Получает список терминов с возможностью фильтрации.
+        Получает список терминов с возможностью фильтрации по названию или определению.
         
         Args:
             skip: Сколько записей пропустить
             limit: Максимальное количество терминов для возврата
-            query: Опциональный словарь для фильтрации
+            query: Опциональная строка для поиска по названию или определению
             
         Returns:
             Список терминов
         """
-        query = query or {}
-        cursor = self.collection.find(query).skip(skip).limit(limit)
+        filter_query = {}
+        if query:
+            # Используем $or для поиска совпадений в полях name или current_definition
+            # $regex используется для нечеткого поиска (можно добавить опции i для регистронезависимости)
+            filter_query['$or'] = [
+                {'name': {'$regex': query, '$options': 'i'}},
+                {'current_definition': {'$regex': query, '$options': 'i'}},
+                {'tags': {'$regex': query, '$options': 'i'}}
+            ]
+
+        cursor = self.collection.find(filter_query).skip(skip).limit(limit)
         terms = []
         async for term_data in cursor:
             terms.append(Term(**term_data))

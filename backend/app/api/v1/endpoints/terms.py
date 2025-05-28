@@ -6,9 +6,10 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app import crud
 from app.api.v1 import deps
-from app.models.term import Term, TermCreate, TermUpdate
+from app.models.term import Term, TermCreate, TermUpdate, TermPublic
 from app.models.user import UserPublic
 from app.models.term_document import TermUsageStatistic
+from app.models.document import DocumentPublic
 
 router = APIRouter()
 
@@ -28,7 +29,7 @@ async def create_term(
     term = await term_crud.create(term_in=term_in, user_id=current_user.id)
     return term
 
-@router.get("/", response_model=List[Term])
+@router.get("/", response_model=List[TermPublic])
 async def read_terms(
     skip: int = 0,
     limit: int = 100,
@@ -39,7 +40,19 @@ async def read_terms(
     """Получить список терминов с возможностью поиска."""
     term_crud = crud.CRUDTerm(db)
     terms = await term_crud.get_multiple(skip=skip, limit=limit, query=query)
-    return terms
+    
+    terms_public = []
+    for term in terms:
+        term_dict = term.model_dump() # Получаем словарь из модели Pydantic
+        term_dict['created_at'] = str(term.created_at) if term.created_at else None
+        term_dict['updated_at'] = str(term.updated_at) if term.updated_at else None
+        # Преобразуем id в строку, если он не строка (модель TermPublic ожидает строку)
+        if isinstance(term_dict.get('id'), UUID):
+            term_dict['id'] = str(term_dict['id'])
+            
+        terms_public.append(TermPublic(**term_dict))
+
+    return terms_public
 
 @router.get("/statistics", response_model=List[TermUsageStatistic])
 async def get_terms_statistics(
@@ -112,7 +125,7 @@ async def delete_term(
     
     return {"success": delete_result, "id": term_id}
 
-@router.get("/{term_id}/documents", response_model=List[crud.document.Document])
+@router.get("/{term_id}/documents", response_model=List[DocumentPublic])
 async def read_documents_for_term(
     term_id: UUID,
     db: AsyncIOMotorDatabase = Depends(deps.get_db),
@@ -129,10 +142,20 @@ async def read_documents_for_term(
     document_ids = [relation.document_id for relation in relations]
     
     # Получаем полную информацию о документах по их ID
-    documents = []
+    documents_public = []
     for doc_id in document_ids:
         document = await document_crud.get_by_id(doc_id=doc_id)
         if document:
-            documents.append(document)
+            # Преобразуем поля в строки для соответствия DocumentPublic
+            document_dict = document.model_dump()
+            document_dict['approval_date'] = str(document.approval_date) if document.approval_date else None
+            document_dict['document_url'] = str(document.document_url) if document.document_url else None
+            document_dict['created_at'] = str(document.created_at) if document.created_at else None
+            document_dict['updated_at'] = str(document.updated_at) if document.updated_at else None
+            # Убедимся, что ID в строковом формате, если он UUID
+            if isinstance(document_dict.get('id'), UUID):
+                 document_dict['id'] = str(document_dict['id'])
             
-    return documents
+            documents_public.append(DocumentPublic(**document_dict))
+            
+    return documents_public

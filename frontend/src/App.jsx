@@ -7,6 +7,7 @@ import DashboardPage from './pages/DashboardPage';
 import SearchPage from './pages/SearchPage';
 import TermPage from './pages/TermPage';
 import DocumentAnalysisPage from './pages/DocumentAnalysisPage';
+import DocumentPage from './pages/DocumentPage';
 
 // Компонент для защиты роутов
 const ProtectedRoute = ({ children }) => {
@@ -59,7 +60,8 @@ function AppContent() {
           <Route path="/" element={<Navigate to="/search" replace />} />
 
           <Route path="/search" element={<SearchPage />} />
-          <Route path="/term/:termName" element={<TermPage />} />
+          <Route path="/term/:termId" element={<TermPage />} />
+          <Route path="/document/:docId" element={<DocumentPage />} />
           <Route path="/analyze-document" element={<DocumentAnalysisPage />} />
 
           <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />

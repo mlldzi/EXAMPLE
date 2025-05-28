@@ -1,14 +1,55 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import TermItem from '../components/TermItem';
+import termsApi from '../api/terms'; // Импортируем API клиент для терминов
+import { useAuth } from '../contexts/AuthContext';
 
-function SearchPage() {
-  // Заглушка для списка терминов в формате API
-  const terms = [
-    { term: 'Термин 1', definition: 'Определение 1', source: 'ВНД 1', year: 2023 },
-    { term: 'Термин 2', definition: 'Определение 2', source: 'ВНД 2', year: 2022 },
-    { term: 'Термин 3', definition: 'Определение 3', source: 'ВНД 3', year: 2024 },
-    { term: 'Еще один термин', definition: 'Определение 4', source: 'ВНД 4', year: 2021 },
-  ];
+const SearchPage = () => {
+  const { apiClient } = useAuth(); // Получаем apiClient из AuthContext
+  const [searchTerm, setSearchTerm] = useState(''); // Состояние для поискового запроса
+  const [terms, setTerms] = useState([]);
+  const [loading, setLoading] = useState(false); // Изначально не загружаем все термины
+  const [error, setError] = useState(null);
+
+  // Функция для загрузки терминов с возможностью поиска
+  const fetchTerms = async (query = '') => {
+    setLoading(true);
+    setError(null);
+    try {
+      // Передаем поисковый запрос в API
+      const data = await termsApi.getTerms(apiClient, { query: query });
+      setTerms(data);
+      setLoading(false);
+    } catch (err) {
+      setError('Не удалось загрузить термины.');
+      setLoading(false);
+      console.error('Error fetching terms in SearchPage:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Обработчик изменения поля ввода поиска
+  const handleSearchInputChange = (event) => {
+    setSearchTerm(event.target.value);
+  };
+
+  // Обработчик нажатия кнопки поиска или Enter в поле ввода
+  const handleSearch = () => {
+    fetchTerms(searchTerm); // Запускаем поиск с текущим значением searchTerm
+  };
+  
+  // При монтировании компонента загрузим все термины (пустой поиск)
+  useEffect(() => {
+      fetchTerms('');
+  }, [apiClient]); // Зависимость от apiClient
+
+  if (loading) {
+    return <div>Загрузка терминов...</div>;
+  }
+
+  if (error) {
+    return <div style={{ color: 'red' }}>Ошибка: {error}</div>;
+  }
 
   return (
     <div>
@@ -19,6 +60,13 @@ function SearchPage() {
         <input 
           type="text" 
           placeholder="Искать термин..."
+          value={searchTerm} // Привязываем значение к состоянию
+          onChange={handleSearchInputChange} // Обработчик изменения
+          onKeyDown={(e) => { // Поиск по нажатию Enter
+            if (e.key === 'Enter') {
+              handleSearch();
+            }
+          }}
           style={{
             padding: '10px',
             marginRight: '8px',
@@ -27,15 +75,19 @@ function SearchPage() {
             fontSize: '1rem'
           }}
         />
-        <button style={{ padding: '10px 15px', fontSize: '1rem' }}>Найти</button>
+        <button onClick={handleSearch} style={{ padding: '10px 15px', fontSize: '1rem' }}>Найти</button>
       </div>
 
       <h2>Список терминов</h2>
       <div>
-        {terms.map((term, index) => (
-          // Используем index в качестве key пока нет уникального id от API
-          <TermItem key={index} term={term} />
-        ))}
+        {terms.length > 0 ? (
+          terms.map((term) => (
+            // Используем id термина в качестве key, предполагая его наличие от API
+            <TermItem key={term.id} term={term} />
+          ))
+        ) : (
+          <div>Термины не найдены.</div>
+        )}
       </div>
     </div>
   );
