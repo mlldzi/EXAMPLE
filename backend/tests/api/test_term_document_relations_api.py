@@ -1,0 +1,251 @@
+import pytest
+from httpx import AsyncClient
+from uuid import uuid4
+from datetime import datetime, timezone
+
+from app.models.term_document import TermDocumentRelationCreate, TermDocumentRelationUpdate
+
+# Предполагаем, что у вас есть фикстуры app_client и auth_headers в conftest.py
+
+# Вспомогательные функции для создания термина и документа через API
+async def create_test_term(client: AsyncClient, headers: dict):
+    term_data = {"name": f"Термин для связи {uuid4()}", "definition": "Определение для связи"}
+    response = await client.post("/api/v1/terms/", json=term_data, headers=headers)
+    assert response.status_code == 201
+    return response.json()
+
+async def create_test_document(client: AsyncClient, headers: dict):
+    doc_data = {
+        "title": f"Документ для связи {uuid4()}",
+        "document_number": f"ДС-{uuid4()}",
+        "approval_date": datetime.now(timezone.utc).isoformat()
+    }
+    response = await client.post("/api/v1/documents/", json=doc_data, headers=headers)
+    assert response.status_code == 201
+    return response.json()
+
+@pytest.mark.asyncio
+async def test_create_relation_api(app_client: AsyncClient, auth_headers: dict):
+    """Тест создания связи термин-документ через API."""
+    # Создаем тестовые термин и документ
+    term = await create_test_term(app_client, auth_headers)
+    document = await create_test_document(app_client, auth_headers)
+    
+    relation_data = {
+        "term_id": str(term["id"]),
+        "document_id": str(document["id"]),
+        "term_definition_in_document": "Определение из документа (API)",
+        "context": "Контекст использования (API)",
+        "locations": [{"page": 1, "section": "Введение (API)"}]
+    }
+    
+    response = await app_client.post(
+        "/api/v1/term_document_relations/",
+        json=relation_data,
+        headers=auth_headers
+    )
+    
+    assert response.status_code == 201
+    created_relation = response.json()
+    
+    assert created_relation["term_id"] == relation_data["term_id"]
+    assert created_relation["document_id"] == relation_data["document_id"]
+    assert created_relation["term_definition_in_document"] == relation_data["term_definition_in_document"]
+    assert created_relation["context"] == relation_data["context"]
+    assert created_relation["locations"] == relation_data["locations"]
+    assert "id" in created_relation
+    assert "created_at" in created_relation
+    assert "updated_at" in created_relation
+    assert "conflict_status" in created_relation
+
+@pytest.mark.asyncio
+async def test_create_relation_api_unauthenticated(app_client: AsyncClient):
+    """Тест создания связи без аутентификации."""
+    relation_data = {
+        "term_id": str(uuid4()),
+        "document_id": str(uuid4()),
+        "term_definition_in_document": "Определение"
+    }
+    
+    response = await app_client.post(
+        "/api/v1/term_document_relations/",
+        json=relation_data
+    )
+    
+    assert response.status_code == 401 # Unauthorized
+
+@pytest.mark.asyncio
+async def test_get_relation_by_id_api(app_client: AsyncClient, auth_headers: dict):
+    """Тест получения связи по ID через API."""
+    # Создаем тестовые термин и документ
+    term = await create_test_term(app_client, auth_headers)
+    document = await create_test_document(app_client, auth_headers)
+    
+    # Сначала создаем связь
+    create_response = await app_client.post(
+        "/api/v1/term_document_relations/",
+        json={
+            "term_id": str(term["id"]),
+            "document_id": str(document["id"]),
+            "term_definition_in_document": "Определение для получения по ID API"
+        },
+        headers=auth_headers
+    )
+    assert create_response.status_code == 201
+    created_relation_id = create_response.json()["id"]
+    
+    # Теперь получаем ее по ID
+    get_response = await app_client.get(
+        f"/api/v1/term_document_relations/{created_relation_id}",
+        headers=auth_headers
+    )
+    
+    assert get_response.status_code == 200
+    found_relation = get_response.json()
+    
+    assert found_relation["id"] == created_relation_id
+    assert found_relation["term_id"] == str(term["id"])
+    assert found_relation["document_id"] == str(document["id"])
+
+@pytest.mark.asyncio
+async def test_get_relation_by_id_api_not_found(app_client: AsyncClient, auth_headers: dict):
+    """Тест получения несуществующей связи по ID через API."""
+    fake_relation_id = uuid4()
+    
+    get_response = await app_client.get(
+        f"/api/v1/term_document_relations/{fake_relation_id}",
+        headers=auth_headers
+    )
+    
+    assert get_response.status_code == 404 # Not Found
+
+@pytest.mark.asyncio
+async def test_get_relations_api(app_client: AsyncClient, auth_headers: dict):
+    """Тест получения списка связей через API."""
+    # Создаем тестовые термин и документ
+    term1 = await create_test_term(app_client, auth_headers)
+    doc1 = await create_test_document(app_client, auth_headers)
+    term2 = await create_test_term(app_client, auth_headers)
+    doc2 = await create_test_document(app_client, auth_headers)
+    
+    # Создаем несколько связей
+    await app_client.post(
+        "/api/v1/term_document_relations/", 
+        json={
+            "term_id": str(term1["id"]),
+            "document_id": str(doc1["id"]),
+            "term_definition_in_document": "Связь API 1"
+        },
+        headers=auth_headers
+    )
+    await app_client.post(
+         "/api/v1/term_document_relations/", 
+        json={
+            "term_id": str(term2["id"]),
+            "document_id": str(doc2["id"]),
+            "term_definition_in_document": "Связь API 2"
+        },
+        headers=auth_headers
+    )
+    
+    get_response = await app_client.get(
+        "/api/v1/term_document_relations/",
+        headers=auth_headers
+    )
+    
+    assert get_response.status_code == 200
+    relations = get_response.json()
+    
+    assert isinstance(relations, list)
+    assert len(relations) >= 2 # Могут быть связи из других тестов
+    
+    # Проверяем наличие созданных связей по определениям
+    definitions_in_results = [r["term_definition_in_document"] for r in relations]
+    assert "Связь API 1" in definitions_in_results
+    assert "Связь API 2" in definitions_in_results
+
+@pytest.mark.asyncio
+async def test_update_relation_api(app_client: AsyncClient, auth_headers: dict):
+    """Тест обновления связи термин-документ через API."""
+     # Создаем тестовые термин и документ
+    term = await create_test_term(app_client, auth_headers)
+    document = await create_test_document(app_client, auth_headers)
+    
+    # Сначала создаем связь
+    create_response = await app_client.post(
+        "/api/v1/term_document_relations/",
+        json={
+            "term_id": str(term["id"]),
+            "document_id": str(document["id"]),
+            "term_definition_in_document": "Старое определение связи API",
+            "context": "Старый контекст API"
+        },
+        headers=auth_headers
+    )
+    assert create_response.status_code == 201
+    created_relation = create_response.json()
+    created_relation_id = created_relation["id"]
+    original_updated_at = created_relation["updated_at"]
+    
+    # Данные для обновления
+    update_data = {
+        "term_definition_in_document": "Новое определение связи API",
+        "context": "Новый контекст API"
+        # Статус конфликта не обновляется напрямую через PUT
+    }
+    
+    update_response = await app_client.put(
+        f"/api/v1/term_document_relations/{created_relation_id}",
+        json=update_data,
+        headers=auth_headers
+    )
+    
+    assert update_response.status_code == 200
+    updated_relation = update_response.json()
+    
+    assert updated_relation["id"] == created_relation_id
+    assert updated_relation["term_definition_in_document"] == update_data["term_definition_in_document"]
+    assert updated_relation["context"] == update_data["context"]
+    assert updated_relation["updated_at"] > original_updated_at
+    # Проверяем, что статус конфликта не изменился
+    assert updated_relation["conflict_status"] == created_relation["conflict_status"]
+
+@pytest.mark.asyncio
+async def test_delete_relation_api(app_client: AsyncClient, auth_headers: dict):
+    """Тест удаления связи термин-документ через API."""
+    # Создаем тестовые термин и документ
+    term = await create_test_term(app_client, auth_headers)
+    document = await create_test_document(app_client, auth_headers)
+    
+    # Сначала создаем связь
+    create_response = await app_client.post(
+        "/api/v1/term_document_relations/",
+        json={
+            "term_id": str(term["id"]),
+            "document_id": str(document["id"]),
+            "term_definition_in_document": "Определение для удаления связи API"
+        },
+        headers=auth_headers
+    )
+    assert create_response.status_code == 201
+    created_relation_id = create_response.json()["id"]
+    
+    # Теперь удаляем ее
+    delete_response = await app_client.delete(
+        f"/api/v1/term_document_relations/{created_relation_id}",
+        headers=auth_headers
+    )
+    
+    assert delete_response.status_code == 200
+    delete_result = delete_response.json()
+    
+    assert delete_result["success"] is True
+    assert delete_result["id"] == created_relation_id
+    
+    # Проверяем, что связь удалена
+    get_response = await app_client.get(
+        f"/api/v1/term_document_relations/{created_relation_id}",
+        headers=auth_headers
+    )
+    
+    assert get_response.status_code == 404 # Not Found 

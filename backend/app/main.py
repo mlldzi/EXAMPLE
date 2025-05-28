@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 from app.db.session import connect_to_mongo, close_mongo_connection
-from app.api.v1.endpoints import users, auth
+from app.api.v1.endpoints import users, auth, term_document_relations, terms, documents
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -27,5 +27,8 @@ app.add_middleware(
 # Подключение маршрутов
 app.include_router(users.router, prefix="/api/v1/users", tags=["users"])
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
+app.include_router(terms.router, prefix="/api/v1/terms", tags=["terms"])
+app.include_router(documents.router, prefix="/api/v1/documents", tags=["documents"])
+app.include_router(term_document_relations.router, prefix="/api/v1/term_document_relations", tags=["term_document_relations"])
 
 # TODO: Добавить другие настройки middleware при необходимости. 
