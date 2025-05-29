@@ -1,7 +1,7 @@
 from typing import Any, List, Dict
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app import crud
@@ -152,7 +152,37 @@ async def read_terms_for_document(
     for term_id in term_ids:
         term = await term_crud.get_by_id(term_id=term_id)
         if term:
-            # print(f'DEBUG: Fetched term in read_terms_for_document: {term}') # Временное логирование
             terms.append(term)
             
     return terms
+
+@router.post("/analyze")
+async def analyze_document(
+    file: UploadFile = File(...),
+    db: AsyncIOMotorDatabase = Depends(deps.get_db),
+    current_user: UserPublic = Depends(deps.get_current_user),
+) -> Any:
+    """Анализирует загруженный документ и извлекает термины и их определения."""
+
+    # Чтение содержимого файла (для будущей реализации парсинга)
+    # content = await file.read()
+
+    # Здесь будет логика парсинга документа и извлечения терминов
+    # Пока возвращаем заглушечные данные в требуемом формате
+    analyzed_data = [
+        {
+            "term": "Заглушка Термин 1",
+            "definition": "Заглушка Определение 1",
+            "source": "Заглушка Источник 1",
+            "year": "2023"
+        },
+        {
+            "term": "Заглушка Термин 2",
+            "definition": "Заглушка Определение 2",
+            "source": "Заглушка Источник 2",
+            "year": "2024"
+        }
+        # Добавьте больше заглушек по необходимости
+    ]
+
+    return analyzed_data

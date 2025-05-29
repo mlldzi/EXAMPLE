@@ -73,7 +73,7 @@ class CRUDTerm:
     
     async def get_by_name(self, *, name: str) -> Optional[Term]:
         """
-        Получает термин по его названию.
+        Получает термин по его названию (с учетом регистра).
         
         Args:
             name: Название термина
@@ -82,6 +82,21 @@ class CRUDTerm:
             Термин, если найден, иначе None
         """
         term_data = await self.collection.find_one({"name": name})
+        if term_data:
+            return Term(**term_data)
+        return None
+    
+    async def get_by_name_case_insensitive(self, *, name: str) -> Optional[Term]:
+        """
+        Получает термин по его названию (без учета регистра).
+
+        Args:
+            name: Название термина
+
+        Returns:
+            Термин, если найден, иначе None
+        """
+        term_data = await self.collection.find_one({"name": {"$regex": f"^{name}$", "$options": "i"}})
         if term_data:
             return Term(**term_data)
         return None
@@ -95,15 +110,14 @@ class CRUDTerm:
         Args:
             skip: Сколько записей пропустить
             limit: Максимальное количество терминов для возврата
-            query: Опциональная строка для поиска по названию или определению
+            query: Опциональная строка для поиска по названию, определению или тегам
             
         Returns:
             Список терминов
         """
         filter_query = {}
         if query:
-            # Используем $or для поиска совпадений в полях name или current_definition
-            # $regex используется для нечеткого поиска (можно добавить опции i для регистронезависимости)
+            # Используем $or для поиска совпадений в полях name, current_definition или tags
             filter_query['$or'] = [
                 {'name': {'$regex': query, '$options': 'i'}},
                 {'current_definition': {'$regex': query, '$options': 'i'}},
@@ -222,4 +236,22 @@ class CRUDTerm:
             }
         ).limit(limit).to_list(length=limit)
         
+        return [Term(**term_data) for term_data in search_results]
+
+    async def search_by_definition(self, *, query: str, limit: int = 20) -> List[Term]:
+        """
+        Поиск терминов по определению.
+
+        Args:
+            query: Строка поиска (regex)
+            limit: Максимальное количество результатов
+
+        Returns:
+            Список найденных терминов
+        """
+        search_results = await self.collection.find(
+            {
+                "current_definition": {"$regex": query, "$options": "i"}}
+        ).limit(limit).to_list(length=limit)
+
         return [Term(**term_data) for term_data in search_results] 

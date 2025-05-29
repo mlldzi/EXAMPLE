@@ -1,12 +1,14 @@
 from typing import Any, List, Dict
 from uuid import UUID
+import re
 
 from fastapi import APIRouter, Depends, HTTPException
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app import crud
 from app.api.v1 import deps
-from app.models.term import Term, TermCreate, TermUpdate, TermPublic
+# Обновляем импорт, чтобы включить новые модели
+from app.models.term import Term, TermCreate, TermUpdate, TermPublic, TermConflictCheck, ConflictDetails, AnalyzedTermData
 from app.models.user import UserPublic
 from app.models.term_document import TermUsageStatistic
 from app.models.document import DocumentPublic
@@ -22,12 +24,120 @@ async def create_term(
     """Создать новый термин."""
     term_crud = crud.CRUDTerm(db)
     # Опционально: проверить наличие термина с таким же именем перед созданием
-    existing_term = await term_crud.get_by_name(name=term_in.name)
-    if existing_term:
-        raise HTTPException(status_code=400, detail="Термин с таким именем уже существует")
+    # existing_term = await term_crud.get_by_name(name=term_in.name)
+    # if existing_term:
+    #     raise HTTPException(status_code=400, detail="Термин с таким именем уже существует")
         
     term = await term_crud.create(term_in=term_in, user_id=current_user.id)
     return term
+
+@router.post("/bulk-save", response_model=Dict[str, Any])
+async def bulk_save_terms(
+    terms_in: List[AnalyzedTermData],
+    db: AsyncIOMotorDatabase = Depends(deps.get_db),
+    current_user: UserPublic = Depends(deps.get_current_user),
+) -> Dict[str, Any]:
+    """Сохранить список терминов, полученных после анализа документа."""
+    term_crud = crud.CRUDTerm(db)
+    saved_count = 0
+    errors = []
+
+    for term_data in terms_in:
+        try:
+            # Проверяем, существует ли термин с таким именем (регистронезависимо)
+            existing_term = await term_crud.get_by_name_case_insensitive(name=term_data.name)
+            
+            if existing_term:
+                # TODO: Обработка конфликта - что делать, если термин уже существует?
+                # Сейчас просто пропускаем
+                errors.append({"name": term_data.name, "detail": "Термин с таким именем уже существует"})
+                continue
+            
+            # Создаем объект TermCreate для использования с CRUD
+            term_create_data = TermCreate(
+                name=term_data.name,
+                definition=term_data.definition,
+                # source_document_id пока не передаем при bulk-save
+                tags=[] # Теги пока не передаем при bulk-save
+            )
+            
+            # Создаем термин
+            await term_crud.create(term_in=term_create_data, user_id=current_user.id)
+            saved_count += 1
+            
+        except Exception as e:
+            errors.append({"name": term_data.name, "detail": str(e)})
+
+    return {"saved_count": saved_count, "errors": errors}
+
+@router.post("/check-conflict", response_model=List[ConflictDetails])
+async def check_term_conflict(
+    term_check_in: TermConflictCheck,
+    db: AsyncIOMotorDatabase = Depends(deps.get_db),
+    current_user: UserPublic = Depends(deps.get_current_user),
+) -> Any:
+    """Проверить наличие конфликтов для данного термина (по имени или схожему определению)."""
+    term_crud = crud.CRUDTerm(db)
+    conflicts: Dict[UUID, ConflictDetails] = {}
+
+    # 1. Проверка на совпадение по имени (регистронезависимая)
+    existing_term_by_name = await term_crud.get_by_name_case_insensitive(name=term_check_in.name)
+    if existing_term_by_name:
+        # Получаем ID документа-источника для текущего определения, если оно есть
+        source_document_id = None
+        source_document_title = None
+        if existing_term_by_name.definitions_history:
+            latest_definition = existing_term_by_name.definitions_history[0] # Предполагаем, что первое определение - самое актуальное или основное
+            source_document_id = latest_definition.source_document_id
+            
+            # Если ID источника есть, пытаемся получить название документа
+            if source_document_id:
+                 document_crud = crud.CRUDDocument(db) # Создаем экземпляр CRUD для документов
+                 source_document = await document_crud.get_by_id(doc_id=source_document_id)
+                 if source_document:
+                     source_document_title = source_document.title
+
+        conflicts[existing_term_by_name.id] = ConflictDetails(
+            conflicting_term_id=existing_term_by_name.id,
+            conflicting_term_name=existing_term_by_name.name,
+            conflicting_definition=existing_term_by_name.current_definition,
+            source_document_id=source_document_id, # Добавляем ID источника
+            source_document_title=source_document_title # Добавляем название источника
+        )
+
+    # 2. Проверка на совпадение по определению (нечеткое совпадение с использованием regex)
+    # Ищем термины, где определение содержит подстроку из проверяемого определения
+    # или проверяемое определение содержит подстроку из определения термина
+    # (Базовый нечеткий поиск, можно улучшить)
+    definition_query = term_check_in.definition
+    if definition_query:
+        # Экранируем специальные символы regex в запросе пользователя
+        # Используем re.escape для корректного экранирования
+        escaped_query = re.escape(definition_query)
+        
+        # Ищем термины, чье определение содержит искомую строку (регистронезависимо)
+        terms_matching_definition = await term_crud.search_by_definition(query=escaped_query)
+        
+        for term in terms_matching_definition:
+            # Избегаем добавления уже найденного конфликта по имени, если это тот же термин
+            if term.id not in conflicts:
+                 conflicts[term.id] = ConflictDetails(
+                    conflicting_term_id=term.id,
+                    conflicting_term_name=term.name,
+                    conflicting_definition=term.current_definition
+                )
+
+    # TODO: Добавить логику проверки конфликтов с учетом года, если это необходимо
+    # Например, термины с одинаковым названием, но разным годом могут считаться конфликтом.
+
+    # Возвращаем список уникальных конфликтов
+    return list(conflicts.values())
+
+# В CRUD потребуется метод search_by_definition
+# Добавляю заглушку здесь, чтобы не забыть
+# async def search_by_definition(self, query: str, limit: int = 20) -> List[Term]:
+#     # Implement search by definition
+#     pass
 
 @router.get("/", response_model=List[TermPublic])
 async def read_terms(

@@ -1,9 +1,32 @@
 from uuid import UUID
 from typing import List, Optional
 from datetime import datetime
-from pydantic import Field
+from pydantic import Field, BaseModel
 
 from app.models.base import MongoBaseModel, TimeStampedModel
+
+# Модель для данных термина после анализа документа
+class AnalyzedTermData(BaseModel):
+    name: str
+    definition: str
+    year: Optional[str] = None # Добавляем поле для года
+    # Другие поля, которые могут быть извлечены из документа
+
+class TermConflictCheck(BaseModel):
+    """Модель для данных, отправляемых для проверки конфликта."""
+    name: str
+    definition: str
+    year: Optional[str] = None
+    # source: Optional[str] = None
+
+class ConflictDetails(BaseModel):
+    """Модель для ответа о конфликте."""
+    conflicting_term_id: UUID
+    conflicting_term_name: str
+    conflicting_definition: str
+    source_document_id: Optional[UUID] = None
+    source_document_title: Optional[str] = None
+    # Могут быть добавлены другие детали конфликта, например, тип конфликта
 
 class TermDefinition(MongoBaseModel):
     """Модель определения термина."""

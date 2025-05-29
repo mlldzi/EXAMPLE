@@ -40,6 +40,26 @@ const getDocumentsForTerm = async (apiClient, termId) => {
   }
 };
 
+const checkTermConflict = async (apiClient, termData) => {
+  try {
+    const response = await apiClient.post('/terms/check-conflict', termData);
+    return response.data;
+  } catch (error) {
+    console.error('Error checking term conflict:', error);
+    throw error;
+  }
+};
+
+const bulkSaveTerms = async (apiClient, termsData) => {
+  try {
+    const response = await apiClient.post('/terms/bulk-save', termsData);
+    return response.data;
+  } catch (error) {
+    console.error('Error during bulk save:', error);
+    throw error;
+  }
+};
+
 // Добавьте другие функции для CRUD операций с терминами здесь при необходимости
 
 export default {
@@ -47,5 +67,7 @@ export default {
   getTermById,
   getTermStatistics,
   getDocumentsForTerm,
+  checkTermConflict,
+  bulkSaveTerms
   // Экспортируйте другие функции здесь
 }; 
