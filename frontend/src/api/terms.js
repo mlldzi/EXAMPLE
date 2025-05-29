@@ -40,6 +40,18 @@ const getDocumentsForTerm = async (apiClient, termId) => {
   }
 };
 
+const getTermsByNames = async (apiClient, termNames) => {
+  try {
+    // Использование параметра query для поискового запроса
+    // и фильтрация на клиенте для точного совпадения по имени
+    const allTerms = await getTerms(apiClient, { query: termNames.join(' ') });
+    return allTerms.filter(term => termNames.includes(term.name));
+  } catch (error) {
+    console.error('Error fetching terms by names:', error);
+    throw error;
+  }
+};
+
 const checkTermConflict = async (apiClient, termData) => {
   try {
     const response = await apiClient.post('/terms/check-conflict', termData);
@@ -67,6 +79,7 @@ export default {
   getTermById,
   getTermStatistics,
   getDocumentsForTerm,
+  getTermsByNames,
   checkTermConflict,
   bulkSaveTerms
   // Экспортируйте другие функции здесь

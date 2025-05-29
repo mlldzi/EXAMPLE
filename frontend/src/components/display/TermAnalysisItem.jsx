@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 
 function TermAnalysisItem({
-  item, // { term, definition, source, year }
+  item, // { term, definition, year } - year используется только при сохранении
   onSave, // Callback function to save the item
   onCancel, // Callback function to cancel editing
   conflicts, // Добавляем пропс для конфликтов
@@ -16,7 +16,7 @@ function TermAnalysisItem({
   useEffect(() => {
     setEditedTerm(item.term);
     setEditedDefinition(item.definition);
-    setEditedYear(item.year);
+    setEditedYear(item.year || '');
   }, [item]);
 
   const handleEditClick = () => {
@@ -26,12 +26,14 @@ function TermAnalysisItem({
   const handleSaveClick = () => {
     // Validate data if needed
     if (onSave) {
-      onSave({
+      const updatedItem = {
         ...item, // Keep original id/keys if any
         term: editedTerm,
         definition: editedDefinition,
         year: editedYear,
-      });
+      };
+      
+      onSave(updatedItem);
       setIsEditing(false);
     }
   };
@@ -40,13 +42,13 @@ function TermAnalysisItem({
     // Reset fields to original item values
     setEditedTerm(item.term);
     setEditedDefinition(item.definition);
-    setEditedYear(item.year);
+    setEditedYear(item.year || '');
     setIsEditing(false);
   };
 
   if (isEditing) {
     return (
-      <div style={{ marginBottom: '10px', border: '1px solid #ccc', padding: '10px' }}>
+      <div style={{ marginBottom: '10px', padding: '10px' }}>
         {conflicts && conflicts.length > 0 && (
             <div style={{ color: 'orange', marginBottom: '10px' }}>
                 <h4>Обнаружены потенциальные конфликты:</h4>
@@ -59,42 +61,51 @@ function TermAnalysisItem({
                 </ul>
             </div>
         )}
-        <div>
-          <label>Термин:</label>
+        <div style={{ marginBottom: '10px' }}>
+          <label style={{ display: 'block', marginBottom: '5px' }}>Термин:</label>
           <input
             type="text"
             value={editedTerm}
             onChange={(e) => setEditedTerm(e.target.value)}
+            style={{ width: '100%', padding: '5px' }}
           />
         </div>
-        <div>
-          <label>Определение:</label>
+        <div style={{ marginBottom: '10px' }}>
+          <label style={{ display: 'block', marginBottom: '5px' }}>Определение:</label>
           <textarea
             value={editedDefinition}
             onChange={(e) => setEditedDefinition(e.target.value)}
             rows="4"
-            cols="50"
+            style={{ width: '100%', padding: '5px' }}
           />
         </div>
-        <div>
-          <label>Год:</label>
+        {/* Скрываем поле год на UI, но сохраняем его в данных */}
+        <div style={{ display: 'none' }}>
           <input
             type="text"
-            value={editedYear}
+            value={editedYear || ''}
             onChange={(e) => setEditedYear(e.target.value)}
           />
         </div>
-        {/* Отображение источника, если есть, нередактируемым */}
-        {item.source && <p><strong>Источник:</strong> {item.source}</p>}
-        <div>
-          <button onClick={handleSaveClick}>Сохранить изменения</button>
-          <button onClick={handleCancelClick}>Отмена</button>
+        <div style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
+          <button 
+            onClick={handleSaveClick}
+            style={{ padding: '5px 10px', backgroundColor: '#4CAF50', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+          >
+            Сохранить изменения
+          </button>
+          <button 
+            onClick={handleCancelClick}
+            style={{ padding: '5px 10px', backgroundColor: '#f44336', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+          >
+            Отмена
+          </button>
         </div>
       </div>
     );
   } else {
     return (
-      <div style={{ marginBottom: '10px', border: '1px solid #ccc', padding: '10px' }}>
+      <div style={{ marginBottom: '10px', padding: '10px' }}>
         {conflicts && conflicts.length > 0 && (
             <div style={{ color: 'orange', marginBottom: '10px' }}>
                  <h4>Обнаружены потенциальные конфликты:</h4>
@@ -109,9 +120,13 @@ function TermAnalysisItem({
         )}
         <p><strong>Термин:</strong> {item.term}</p>
         <p><strong>Определение:</strong> {item.definition}</p>
-        {item.source && <p><strong>Источник:</strong> {item.source}</p>}
-        {item.year && <p><strong>Год:</strong> {item.year}</p>}
-        <button onClick={handleEditClick}>Редактировать</button>
+        {/* Убираем отображение года */}
+        <button 
+          onClick={handleEditClick}
+          style={{ padding: '5px 10px', backgroundColor: '#2196F3', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', marginTop: '10px' }}
+        >
+          Редактировать
+        </button>
       </div>
     );
   }

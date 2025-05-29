@@ -1,16 +1,16 @@
 // import apiClient from './apiClient'; // We will now receive apiClient as an argument
 
-const createRelation = async (relationData) => {
+const createTermDocumentRelation = async (apiClient, relationData) => {
   try {
     const response = await apiClient.post('/term_document_relations/', relationData);
     return response.data;
   } catch (error) {
-    console.error('Error creating relation:', error);
+    console.error('Error creating term-document relation:', error);
     throw error;
   }
 };
 
-const getRelationById = async (relationId) => {
+const getRelationById = async (apiClient, relationId) => {
   try {
     const response = await apiClient.get(`/term_document_relations/${relationId}`);
     return response.data;
@@ -20,7 +20,7 @@ const getRelationById = async (relationId) => {
   }
 };
 
-const getRelations = async (params) => {
+const getRelations = async (apiClient, params) => {
   try {
     const response = await apiClient.get('/term_document_relations/', { params });
     return response.data;
@@ -30,7 +30,7 @@ const getRelations = async (params) => {
   }
 };
 
-const updateRelation = async (relationId, updateData) => {
+const updateRelation = async (apiClient, relationId, updateData) => {
   try {
     const response = await apiClient.put(`/term_document_relations/${relationId}`, updateData);
     return response.data;
@@ -40,7 +40,7 @@ const updateRelation = async (relationId, updateData) => {
   }
 };
 
-const deleteRelation = async (relationId) => {
+const deleteRelation = async (apiClient, relationId) => {
   try {
     const response = await apiClient.delete(`/term_document_relations/${relationId}`);
     return response.data;
@@ -73,7 +73,7 @@ const getAllConflictsReport = async (apiClient) => {
 // Добавьте другие функции для CRUD операций со связями здесь при необходимости
 
 export default {
-  createRelation,
+  createTermDocumentRelation,
   getRelationById,
   getRelations,
   updateRelation,

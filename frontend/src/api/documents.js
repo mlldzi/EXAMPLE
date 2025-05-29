@@ -28,11 +28,22 @@ const getTermsForDocument = async (apiClient, docId) => {
   }
 };
 
+const createDocument = async (apiClient, documentData) => {
+  try {
+    const response = await apiClient.post('/documents/', documentData);
+    return response.data;
+  } catch (error) {
+    console.error('Error creating document:', error);
+    throw error;
+  }
+};
+
 // Добавьте другие функции для CRUD операций с документами здесь при необходимости
 
 export default {
   getDocuments,
   getDocumentById,
   getTermsForDocument,
+  createDocument,
   // Экспортируйте другие функции здесь
 }; 
