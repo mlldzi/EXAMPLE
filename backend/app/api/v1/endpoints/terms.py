@@ -259,20 +259,39 @@ async def read_documents_for_term(
     document_ids = [relation.document_id for relation in relations]
     
     # Получаем полную информацию о документах по их ID
-    documents_public = []
+    documents = []
     for doc_id in document_ids:
         document = await document_crud.get_by_id(doc_id=doc_id)
         if document:
-            # Преобразуем поля в строки для соответствия DocumentPublic
+            # Преобразуем в словарь и форматируем даты в строки
             document_dict = document.model_dump()
             document_dict['approval_date'] = str(document.approval_date) if document.approval_date else None
-            document_dict['document_url'] = str(document.document_url) if document.document_url else None
             document_dict['created_at'] = str(document.created_at) if document.created_at else None
             document_dict['updated_at'] = str(document.updated_at) if document.updated_at else None
-            # Убедимся, что ID в строковом формате, если он UUID
+            # Убедимся, что ID в строковом формате
             if isinstance(document_dict.get('id'), UUID):
-                 document_dict['id'] = str(document_dict['id'])
+                document_dict['id'] = str(document_dict['id'])
+                
+            documents.append(DocumentPublic(**document_dict))
             
-            documents_public.append(DocumentPublic(**document_dict))
-            
-    return documents_public
+    return documents
+
+@router.post("/get-by-names", response_model=List[Term])
+async def get_terms_by_names(
+    request: Dict[str, List[str]],
+    db: AsyncIOMotorDatabase = Depends(deps.get_db),
+    current_user: UserPublic = Depends(deps.get_current_user),
+) -> Any:
+    """Получить список терминов по их именам."""
+    if 'names' not in request or not isinstance(request['names'], list):
+        raise HTTPException(status_code=400, detail="Должен быть предоставлен список имен в поле 'names'")
+    
+    term_crud = crud.CRUDTerm(db)
+    terms = []
+    
+    for name in request['names']:
+        term = await term_crud.get_by_name_case_insensitive(name=name)
+        if term:
+            terms.append(term)
+    
+    return terms

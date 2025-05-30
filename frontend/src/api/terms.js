@@ -102,6 +102,17 @@ const termsApi = {
       console.error('Error bulk saving terms:', error);
       throw error;
     }
+  },
+
+  // Получение терминов по их именам
+  getTermsByNames: async (apiClient, termNames) => {
+    try {
+      const response = await apiClient.post('/terms/get-by-names', { names: termNames });
+      return response.data;
+    } catch (error) {
+      console.error('Error getting terms by names:', error);
+      throw error;
+    }
   }
 };
 
