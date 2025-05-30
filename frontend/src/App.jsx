@@ -8,6 +8,8 @@ import SearchPage from './pages/SearchPage';
 import TermPage from './pages/TermPage';
 import DocumentAnalysisPage from './pages/DocumentAnalysisPage';
 import DocumentPage from './pages/DocumentPage';
+import TermsListPage from './pages/TermsListPage';
+import DocumentsListPage from './pages/DocumentsListPage';
 import Modal from './components/Modal';
 import CreateTermForm from './components/CreateTermForm';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -47,8 +49,18 @@ function Navigation() {
           </Link>
         </li>
         <li>
+          <Link to="/terms" className={location.pathname === '/terms' ? 'active' : ''}>
+            <i className="fas fa-book"></i> Термины
+          </Link>
+        </li>
+        <li>
+          <Link to="/documents" className={location.pathname === '/documents' ? 'active' : ''}>
+            <i className="fas fa-file-alt"></i> ВНД
+          </Link>
+        </li>
+        <li>
           <Link to="/analyze-document" className={location.pathname === '/analyze-document' ? 'active' : ''}>
-            <i className="fas fa-file-alt"></i> Анализ документа
+            <i className="fas fa-file-upload"></i> Анализ документа
           </Link>
         </li>
         {accessToken ? (
@@ -108,6 +120,8 @@ function AppContent() {
           <Route path="/" element={<Navigate to="/search" replace />} />
 
           <Route path="/search" element={<SearchPage />} />
+          <Route path="/terms" element={<TermsListPage />} />
+          <Route path="/documents" element={<DocumentsListPage />} />
           <Route path="/term/:termId" element={<TermPage />} />
           <Route path="/document/:docId" element={<DocumentPage />} />
           <Route path="/analyze-document" element={<DocumentAnalysisPage />} />
