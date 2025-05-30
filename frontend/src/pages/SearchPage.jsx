@@ -1,94 +1,103 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import TermItem from '../components/TermItem';
-import termsApi from '../api/terms'; // Импортируем API клиент для терминов
 import { useAuth } from '../contexts/AuthContext';
+import termsApi from '../api/terms';
 
-const SearchPage = () => {
-  const { apiClient } = useAuth(); // Получаем apiClient из AuthContext
-  const [searchTerm, setSearchTerm] = useState(''); // Состояние для поискового запроса
+function SearchPage() {
+  const [searchQuery, setSearchQuery] = useState('');
   const [terms, setTerms] = useState([]);
-  const [loading, setLoading] = useState(false); // Изначально не загружаем все термины
-  const [error, setError] = useState(null);
-
-  // Функция для загрузки терминов с возможностью поиска
-  const fetchTerms = async (query = '') => {
+  const [loading, setLoading] = useState(false);
+  const [initialLoad, setInitialLoad] = useState(true);
+  const { apiClient } = useAuth();
+  
+  useEffect(() => {
+    // Загружаем несколько популярных терминов при первом рендере
+    const fetchInitialTerms = async () => {
+      try {
+        setLoading(true);
+        const response = await termsApi.getTerms(apiClient, 0, 6);
+        setTerms(response);
+        setInitialLoad(false);
+      } catch (error) {
+        console.error('Error fetching initial terms:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    if (initialLoad) {
+      fetchInitialTerms();
+    }
+  }, [apiClient, initialLoad]);
+  
+  const handleSearch = async (e) => {
+    e.preventDefault();
+    if (!searchQuery.trim()) return;
+    
     setLoading(true);
-    setError(null);
     try {
-      // Передаем поисковый запрос в API
-      const data = await termsApi.getTerms(apiClient, { query: query });
-      setTerms(data);
-      setLoading(false);
-    } catch (err) {
-      setError('Не удалось загрузить термины.');
-      setLoading(false);
-      console.error('Error fetching terms in SearchPage:', err);
+      const response = await termsApi.getTerms(apiClient, 0, 100, searchQuery);
+      setTerms(response);
+    } catch (error) {
+      console.error('Error searching terms:', error);
     } finally {
       setLoading(false);
     }
   };
-
-  // Обработчик изменения поля ввода поиска
-  const handleSearchInputChange = (event) => {
-    setSearchTerm(event.target.value);
-  };
-
-  // Обработчик нажатия кнопки поиска или Enter в поле ввода
-  const handleSearch = () => {
-    fetchTerms(searchTerm); // Запускаем поиск с текущим значением searchTerm
-  };
   
-  // При монтировании компонента загрузим все термины (пустой поиск)
-  useEffect(() => {
-      fetchTerms('');
-  }, [apiClient]); // Зависимость от apiClient
-
-  if (loading) {
-    return <div>Загрузка терминов...</div>;
-  }
-
-  if (error) {
-    return <div style={{ color: 'red' }}>Ошибка: {error}</div>;
-  }
-
   return (
-    <div>
-      <h1>Единая база знаний: Глоссарий</h1>
-
-      <div style={{ marginBottom: '20px' }}>
-        {/* Поле поиска */}
-        <input 
-          type="text" 
-          placeholder="Искать термин..."
-          value={searchTerm} // Привязываем значение к состоянию
-          onChange={handleSearchInputChange} // Обработчик изменения
-          onKeyDown={(e) => { // Поиск по нажатию Enter
-            if (e.key === 'Enter') {
-              handleSearch();
-            }
-          }}
-          style={{
-            padding: '10px',
-            marginRight: '8px',
-            border: '1px solid #ccc',
-            borderRadius: '4px',
-            fontSize: '1rem'
-          }}
-        />
-        <button onClick={handleSearch} style={{ padding: '10px 15px', fontSize: '1rem' }}>Найти</button>
+    <div className="search-page fade-in">
+      <div className="search-hero">
+        <h1>Единый глоссарий терминов ВНД</h1>
+        <p className="search-subtitle">Найдите точные определения терминов из нормативных документов</p>
+        
+        <form onSubmit={handleSearch} className="search-form">
+          <div className="search-input-group">
+            <input
+              type="text"
+              placeholder="Введите термин для поиска..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="search-input"
+            />
+            <button type="submit" className="btn btn-primary search-btn">
+              <i className="fas fa-search"></i>
+            </button>
+          </div>
+        </form>
       </div>
-
-      <h2>Список терминов</h2>
-      <div>
-        {terms.length > 0 ? (
-          terms.map((term) => (
-            // Используем id термина в качестве key, предполагая его наличие от API
-            <TermItem key={term.id} term={term} />
-          ))
-        ) : (
-          <div>Термины не найдены.</div>
-        )}
-      </div>
+      
+      {loading ? (
+        <div className="loading-animation">
+          <div className="loader"></div>
+          <p>Поиск терминов...</p>
+        </div>
+      ) : (
+        <div className="search-results">
+          {terms.length > 0 ? (
+            <>
+              <h2>{searchQuery ? 'Результаты поиска' : 'Популярные термины'}</h2>
+              <div className="terms-grid">
+                {terms.map((term) => (
+                  <TermItem key={term.id} term={term} />
+                ))}
+              </div>
+            </>
+          ) : searchQuery ? (
+            <div className="no-results">
+              <i className="fas fa-search fa-4x" style={{ color: 'var(--color-gray-300)', marginBottom: '1rem' }}></i>
+              <h3>Ничего не найдено</h3>
+              <p>Попробуйте изменить запрос или добавить новый термин</p>
+            </div>
+          ) : (
+            <div className="no-results">
+              <i className="fas fa-book fa-4x" style={{ color: 'var(--color-gray-300)', marginBottom: '1rem' }}></i>
+              <h3>Термины не найдены</h3>
+              <p>В системе пока нет добавленных терминов</p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

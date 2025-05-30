@@ -40,7 +40,7 @@ async def _create_token_response(user: UserPublic, db: AsyncIOMotorDatabase) -> 
     access_token = create_access_token(
         data={
             "sub": str(user.id),
-            "roles": [role.value for role in user.roles]
+            "roles": [role for role in user.roles]  # Сохраняем роли как есть
             },
         expires_delta=access_token_expires
     )
@@ -66,7 +66,7 @@ def _create_access_token_for_user(user: UserPublic) -> tuple[str, timedelta]:
     access_token = create_access_token(
         data={
             "sub": str(user.id),
-            "roles": [role.value for role in user.roles],
+            "roles": [role for role in user.roles],  # Сохраняем роли как есть
             "refresh_id": str(uuid4()),  # Добавляем случайный идентификатор для уникальности нового access токена
         },
         expires_delta=access_token_expires

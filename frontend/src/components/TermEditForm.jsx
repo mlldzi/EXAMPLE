@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import termsApi from '../api/terms';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faSave, faTimes, faSpinner } from '@fortawesome/free-solid-svg-icons';
 
 function TermEditForm({ term, onSave, onCancel, apiClient }) {
   const [formData, setFormData] = useState({
@@ -59,11 +61,11 @@ function TermEditForm({ term, onSave, onCancel, apiClient }) {
   };
 
   return (
-    <div className="term-edit-form">
+    <div className="term-edit-form card">
       <h2>Редактировать термин</h2>
       <form onSubmit={handleSubmit}>
-        <div>
-          <label htmlFor="name">Название:</label>
+        <div className="form-group">
+          <label htmlFor="name" className="form-label">Название:</label>
           <input
             type="text"
             id="name"
@@ -73,8 +75,8 @@ function TermEditForm({ term, onSave, onCancel, apiClient }) {
             required
           />
         </div>
-        <div>
-          <label htmlFor="definition">Определение:</label>
+        <div className="form-group">
+          <label htmlFor="definition" className="form-label">Определение:</label>
           <textarea
             id="definition"
             name="definition"
@@ -83,8 +85,8 @@ function TermEditForm({ term, onSave, onCancel, apiClient }) {
             required
           />
         </div>
-        <div>
-          <label htmlFor="tags">Теги (через запятую):</label>
+        <div className="form-group">
+          <label htmlFor="tags" className="form-label">Теги (через запятую):</label>
           <input
             type="text"
             id="tags"
@@ -93,20 +95,43 @@ function TermEditForm({ term, onSave, onCancel, apiClient }) {
             onChange={handleInputChange}
           />
         </div>
-        <div>
-          <label htmlFor="is_approved">Утвержден:</label>
-          <input
-            type="checkbox"
-            id="is_approved"
-            name="is_approved"
-            checked={formData.is_approved}
-            onChange={handleInputChange}
-          />
+        <div className="form-group checkbox-group">
+          <label htmlFor="is_approved" className="form-label checkbox-label">
+            <input
+              type="checkbox"
+              id="is_approved"
+              name="is_approved"
+              checked={formData.is_approved}
+              onChange={handleInputChange}
+            />
+            <span>Утвержден</span>
+          </label>
         </div>
-        {error && <p style={{ color: 'red' }}>{error}</p>}
-        <div>
-          <button type="submit" disabled={saving}>{saving ? 'Сохранение...' : 'Сохранить'}</button>
-          <button type="button" onClick={onCancel} disabled={saving}>Отмена</button>
+        {error && <p className="error-message">{error}</p>}
+        <div className="form-buttons">
+          <button 
+            type="submit" 
+            className="btn btn-primary" 
+            disabled={saving}
+          >
+            {saving ? (
+              <>
+                <FontAwesomeIcon icon={faSpinner} spin /> Сохранение...
+              </>
+            ) : (
+              <>
+                <FontAwesomeIcon icon={faSave} /> Сохранить
+              </>
+            )}
+          </button>
+          <button 
+            type="button" 
+            className="btn" 
+            onClick={onCancel} 
+            disabled={saving}
+          >
+            <FontAwesomeIcon icon={faTimes} /> Отмена
+          </button>
         </div>
       </form>
     </div>

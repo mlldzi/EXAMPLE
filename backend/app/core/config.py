@@ -9,6 +9,9 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 120
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    BASE_URL: str = "http://localhost:8000"
+    ADMIN_EMAIL: str = "admin@example.com"
+    ADMIN_PASSWORD: str = "adminpassword"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding='utf-8')
 

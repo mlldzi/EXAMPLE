@@ -1,5 +1,20 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { 
+  faHistory, 
+  faBook, 
+  faInfoCircle, 
+  faEdit,
+  faExclamationTriangle,
+  faCheckCircle,
+  faTimesCircle,
+  faClock,
+  faUser,
+  faFileAlt,
+  faTags,
+  faUserShield
+} from '@fortawesome/free-solid-svg-icons';
 import DocumentItem from '../components/DocumentItem';
 import termsApi from '../api/terms'; // Import the terms API client
 import termDocumentRelationsApi from '../api/termDocumentRelations'; // Import relations API client
@@ -7,10 +22,11 @@ import TermConflictReport from '../components/display/TermConflictReport'; // Im
 import { useAuth } from '../contexts/AuthContext';
 import documentsApi from '../api/documents';
 import TermEditForm from '../components/TermEditForm';
+import axios from 'axios';
 
 function TermPage() {
   const { termId } = useParams(); // Get termId from URL
-  const { apiClient } = useAuth(); // Получаем apiClient из AuthContext
+  const { apiClient, user } = useAuth(); // Получаем apiClient и user из AuthContext
   const [termData, setTermData] = useState(null);
   const [relatedDocuments, setRelatedDocuments] = useState([]);
   const [conflictsReport, setConflictsReport] = useState(null); // State for conflicts report
@@ -18,6 +34,7 @@ function TermPage() {
   const [error, setError] = useState(null);
   const [sourceDocuments, setSourceDocuments] = useState({});
   const [isEditing, setIsEditing] = useState(false); // Новое состояние для управления видимостью формы редактирования
+  const [activeTab, setActiveTab] = useState('definition');
 
   // Обработчик сохранения формы редактирования
   const handleSave = (updatedTerm) => {
@@ -90,15 +107,32 @@ function TermPage() {
   const memoizedSourceDocuments = useMemo(() => sourceDocuments, [sourceDocuments]);
 
   if (loading) {
-    return <div>Загрузка данных термина...</div>;
+    return (
+      <div className="loading-container">
+        <div className="loading-animation">
+          <div className="loader"></div>
+        </div>
+        <p>Загрузка данных термина...</p>
+      </div>
+    );
   }
 
   if (error) {
-    return <div style={{ color: 'red' }}>Ошибка: {error}</div>;
+    return (
+      <div className="error-container">
+        <FontAwesomeIcon icon={faTimesCircle} className="error-icon" />
+        <p>Ошибка: {error}</p>
+      </div>
+    );
   }
 
   if (!termData) {
-    return <div>Термин не найден.</div>; // If no term data is fetched (e.g., invalid ID)
+    return (
+      <div className="not-found-container">
+        <FontAwesomeIcon icon={faTimesCircle} className="not-found-icon" />
+        <p>Термин не найден.</p>
+      </div>
+    );
   }
 
   // Форма редактирования термина (отображается, если isEditing true)
@@ -114,103 +148,209 @@ function TermPage() {
   }
 
   return (
-    <div>
-      {/* Используем termData.name и termData.current_definition */}
-      <h1>Термин: {termData.name}</h1>
-
-      <div className="term-section">
-        <h2>Определение</h2>
-        <p>{termData.current_definition || 'Определение отсутствует.'}</p>
+    <div className="term-page">
+      <div className="term-page-header">
+        <h1 className="term-page-title">{termData.name}</h1>
+        {user && (
+          user.roles?.includes('ADMIN') || 
+          user.roles?.includes('MODERATOR')
+        ) && (
+          <div className="admin-controls">
+            <button className="btn-edit" onClick={() => setIsEditing(true)}>
+              <FontAwesomeIcon icon={faEdit} />
+              <span>Редактировать</span>
+            </button>
+            {user.roles?.includes('ADMIN') && (
+              <div className="admin-badge">
+                <FontAwesomeIcon icon={faUserShield} />
+                <span>Администратор</span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Дополнительная информация о термине */}
-      <div className="term-section">
-        <h2>Дополнительная информация</h2>
-        <p><strong>Статус:</strong> {termData.is_approved ? 'Утвержден' : 'Не утвержден'}</p>
-        {termData.approved_at && (
-          <p><strong>Утвержден:</strong> {new Date(termData.approved_at).toLocaleString()}</p>
+      <div className="term-status-badge">
+        {termData.is_approved ? (
+          <span className="badge approved">
+            <FontAwesomeIcon icon={faCheckCircle} />
+            Утвержден
+          </span>
+        ) : (
+          <span className="badge pending">
+            <FontAwesomeIcon icon={faTimesCircle} />
+            Не утвержден
+          </span>
         )}
-        {termData.updated_at && (
-          <p><strong>Последнее обновление:</strong> {new Date(termData.updated_at).toLocaleString()}</p>
-        )}
-        {termData.tags && termData.tags.length > 0 && (
-          <p><strong>Теги:</strong> {termData.tags.join(', ')}</p>
-        )}
-        <button onClick={() => setIsEditing(true)}>Редактировать термин</button>
       </div>
 
-      {/* Добавляем секцию для истории определений */}
-      {termData.definitions_history && termData.definitions_history.length > 1 && ( // Проверяем, что история существует и содержит более одного определения (первое - текущее)
-        <div className="term-section">
-          <h2>История определений</h2>
-          <ul>
-            {/* Пропускаем первое определение, так как оно текущее */}
-            {termData.definitions_history.slice(1).map((def, index) => (
-              <li key={index} style={{ marginBottom: '10px' }}>
-                <p><strong>Определение:</strong> {def.definition}</p>
-                {/* Проверяем, что created_at является объектом Date перед форматированием */}
-                <p><strong>Дата создания:</strong> {def.created_at ? new Date(def.created_at).toLocaleString() : 'Неизвестно'}</p>
-                {/* Добавляем отображение пользователя и документа-источника */}
-                {def.created_by && <p><strong>Создано пользователем ID:</strong> {def.created_by}</p>}
-                {/* Отображаем информацию о документе-источнике, даже если ID null */}
-                {def.source_document_id !== undefined && (
-                  <div>
-                    <p>
-                      <strong>Источник:</strong>
-                      {def.source_document_id === null ? 'Не указан' : (
-                        memoizedSourceDocuments[def.source_document_id]?.title || 'Загрузка...'
-                      )}
-                    </p>
-                    <p style={{ marginLeft: '20px' }}>
-                      ID: {def.source_document_id === null ? 'null' : def.source_document_id}
-                    </p>
+      <div className="term-navigation">
+        <div 
+          className={`tab ${activeTab === 'definition' ? 'active' : ''}`}
+          onClick={() => setActiveTab('definition')}
+        >
+          <FontAwesomeIcon icon={faBook} />
+          <span>Определение</span>
+        </div>
+        <div 
+          className={`tab ${activeTab === 'history' ? 'active' : ''}`}
+          onClick={() => setActiveTab('history')}
+        >
+          <FontAwesomeIcon icon={faHistory} />
+          <span>История</span>
+        </div>
+        <div 
+          className={`tab ${activeTab === 'documents' ? 'active' : ''}`}
+          onClick={() => setActiveTab('documents')}
+        >
+          <FontAwesomeIcon icon={faFileAlt} />
+          <span>ВНД</span>
+          {relatedDocuments.length > 0 && (
+            <span className="tab-badge">{relatedDocuments.length}</span>
+          )}
+        </div>
+        <div 
+          className={`tab ${activeTab === 'conflicts' ? 'active' : ''}`}
+          onClick={() => setActiveTab('conflicts')}
+        >
+          <FontAwesomeIcon icon={faExclamationTriangle} />
+          <span>Конфликты</span>
+          {conflictsReport && conflictsReport.length > 0 && (
+            <span className="tab-badge warning">{conflictsReport.length}</span>
+          )}
+        </div>
+      </div>
+
+      <div className="term-content">
+        {activeTab === 'definition' && (
+          <div className="term-definition-section">
+            <div className="definition-card">
+              <h2>Определение</h2>
+              <div className="definition-text">
+                {termData.current_definition || 'Определение отсутствует.'}
+              </div>
+              
+              <div className="term-meta">
+                {termData.updated_at && (
+                  <div className="meta-item">
+                    <FontAwesomeIcon icon={faClock} />
+                    <span>Обновлено: {new Date(termData.updated_at).toLocaleString()}</span>
                   </div>
                 )}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* Source and Year fields might not be directly on the term model from API. */}
-      {/* If needed, we would fetch document details to get this info. */}
-      {/* For now, removing this section as it's based on mock data. */}
-      {/*
-      {(termData.source || termData.year) && (
-        <div className="term-section">
-          <h2>Источник и Год</h2>
-          <p>
-            {termData.source && <span>Источник: {termData.source}</span>}
-            {termData.source && termData.year && <span>, </span>}
-            {termData.year && <span>Год: {termData.year}</span>}
-          </p>
-        </div>
-      )}
-      */}
-
-      {/* Отображение списка ВНД, связанных с термином */}
-      {relatedDocuments.length > 0 && (
-        <div className="term-section">
-          <h2>Использование во ВНД</h2>
-          <div>
-            {relatedDocuments.map((doc) => (
-              <DocumentItem key={doc.id} document={doc} />
-            ))}
+                
+                {termData.approved_at && (
+                  <div className="meta-item">
+                    <FontAwesomeIcon icon={faCheckCircle} />
+                    <span>Утверждено: {new Date(termData.approved_at).toLocaleString()}</span>
+                  </div>
+                )}
+              </div>
+              
+              {termData.tags && termData.tags.length > 0 && (
+                <div className="term-tags">
+                  <FontAwesomeIcon icon={faTags} />
+                  {termData.tags.map((tag, index) => (
+                    <span key={index} className="term-tag">{tag}</span>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Секция для выявления разночтений и отчета о конфликтах */}
-      <div className="term-section">
-        <h2>Отчет о конфликтах определений</h2>
-        {/* Здесь будет отображаться отчет о конфликтах с использованием нового компонента */}
-        {conflictsReport && conflictsReport.length > 0 ? (
-          <TermConflictReport conflicts={conflictsReport} /> // Передаем отчет в новый компонент
-        ) : (
-          <p>Конфликты определений не обнаружены.</p>
+        {activeTab === 'history' && (
+          <div className="term-history-section">
+            <h2>
+              <FontAwesomeIcon icon={faHistory} />
+              История определений
+            </h2>
+            
+            {termData.definitions_history && termData.definitions_history.length > 1 ? (
+              <div className="history-timeline">
+                {termData.definitions_history.map((def, index) => (
+                  <div 
+                    key={index} 
+                    className={`timeline-item ${index === 0 ? 'current' : ''}`}
+                  >
+                    <div className="timeline-point"></div>
+                    <div className="timeline-content">
+                      <div className="timeline-header">
+                        <div className="timeline-date">
+                          <FontAwesomeIcon icon={faClock} />
+                          <span>{def.created_at ? new Date(def.created_at).toLocaleString() : 'Неизвестно'}</span>
+                        </div>
+                        {index === 0 && (
+                          <span className="current-badge">Текущее</span>
+                        )}
+                      </div>
+                      
+                      <div className="timeline-definition">
+                        {def.definition}
+                      </div>
+                      
+                      <div className="timeline-meta">
+                        {def.created_by && (
+                          <div className="meta-item">
+                            <FontAwesomeIcon icon={faUser} />
+                            <span>Создано пользователем ID: {def.created_by}</span>
+                          </div>
+                        )}
+                        
+                        {def.source_document_id !== undefined && (
+                          <div className="meta-item">
+                            <FontAwesomeIcon icon={faFileAlt} />
+                            <span>Источник: {
+                              def.source_document_id === null 
+                              ? 'Не указан' 
+                              : (memoizedSourceDocuments[def.source_document_id]?.title || 'Загрузка...')
+                            }</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="no-history">
+                <p>История определений отсутствует.</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'documents' && (
+          <div className="term-documents-section">
+            <h2>
+              <FontAwesomeIcon icon={faFileAlt} />
+              Использование во ВНД
+            </h2>
+            
+            {relatedDocuments.length > 0 ? (
+              <div className="documents-grid">
+                {relatedDocuments.map((doc) => (
+                  <DocumentItem key={doc.id} document={doc} />
+                ))}
+              </div>
+            ) : (
+              <div className="no-documents">
+                <p>Термин не найден в нормативных документах.</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'conflicts' && (
+          <div className="term-conflicts-section">
+            <h2>
+              <FontAwesomeIcon icon={faExclamationTriangle} />
+              Отчет о конфликтах определений
+            </h2>
+            
+            <TermConflictReport conflicts={conflictsReport} />
+          </div>
         )}
       </div>
-
     </div>
   );
 }

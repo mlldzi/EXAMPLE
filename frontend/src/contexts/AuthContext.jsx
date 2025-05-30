@@ -1,17 +1,32 @@
-import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 
-const AuthContext = createContext(null);
+const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const navigate = useNavigate();
+  const [accessToken, setAccessToken] = useState(localStorage.getItem('accessToken') || null);
+  const [refreshToken, setRefreshToken] = useState(localStorage.getItem('refreshToken') || null);
   const [user, setUser] = useState(null);
-  const [accessToken, setAccessTokenState] = useState(localStorage.getItem('accessToken'));
-  const [refreshToken, setRefreshTokenState] = useState(localStorage.getItem('refreshToken'));
   const [loading, setLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshLoading, setRefreshLoading] = useState(false);
   const [failedQueue, setFailedQueue] = useState([]);
+  // Состояние для дебаг-режима администратора
+  const [debugAdminMode, setDebugAdminMode] = useState(
+    localStorage.getItem('debugAdminMode') === 'true' || false
+  );
+
+  // Проверяем токены при инициализации
+  useEffect(() => {
+    // Если токены есть, но они невалидны (например, пустые строки), очистим их
+    if (accessToken === '' || refreshToken === '') {
+      setAccessToken(null);
+      setRefreshToken(null);
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+    }
+  }, []);
 
   const processQueue = (error, token = null) => {
     failedQueue.forEach(prom => {
@@ -25,8 +40,8 @@ export const AuthProvider = ({ children }) => {
   };
 
   const setTokens = (newAccessToken, newRefreshToken) => {
-    setAccessTokenState(newAccessToken);
-    setRefreshTokenState(newRefreshToken);
+    setAccessToken(newAccessToken);
+    setRefreshToken(newRefreshToken);
     if (newAccessToken) {
       localStorage.setItem('accessToken', newAccessToken);
     } else {
@@ -39,15 +54,76 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Функция для включения/выключения режима администратора для отладки
+  const toggleDebugAdminMode = () => {
+    const newMode = !debugAdminMode;
+    setDebugAdminMode(newMode);
+    localStorage.setItem('debugAdminMode', newMode);
+    
+    // Если у нас есть пользователь, то модифицируем его роли
+    if (user) {
+      setUser(prevUser => {
+        const userCopy = { ...prevUser };
+        
+        // Если включаем режим администратора
+        if (newMode) {
+          // Добавляем роль ADMIN, если её нет
+          if (!userCopy.roles.includes('ADMIN')) {
+            userCopy.roles = [...userCopy.roles, 'ADMIN'];
+          }
+          
+          // Оповещение о включении режима администратора
+          console.log('🔓 Режим администратора включен. Роли пользователя:', userCopy.roles);
+          alert('Режим администратора включен. Теперь вы можете редактировать и утверждать термины.');
+          
+          // Принудительно обновляем данные пользователя с сервера
+          setTimeout(fetchUserData, 500);
+        } else {
+          // Если выключаем и у пользователя была реальная роль ADMIN, оставляем как есть
+          // Иначе, удаляем роль ADMIN, добавленную в режиме отладки
+          const originalRoles = JSON.parse(localStorage.getItem('originalUserRoles') || '[]');
+          if (!originalRoles.includes('ADMIN')) {
+            userCopy.roles = userCopy.roles.filter(role => role !== 'ADMIN');
+          }
+          
+          // Оповещение о выключении режима администратора
+          console.log('🔒 Режим администратора выключен. Роли пользователя:', userCopy.roles);
+          alert('Режим администратора выключен.');
+          
+          // Принудительно обновляем данные пользователя с сервера
+          setTimeout(fetchUserData, 500);
+        }
+        
+        return userCopy;
+      });
+    }
+  };
+
   const apiClient = axios.create({
-    baseURL: '/api/v1'
+    baseURL: '/api/v1',
+    headers: {
+      'Content-Type': 'application/json',
+    },
   });
 
   apiClient.interceptors.request.use(
     config => {
+      // Первым делом проверяем и добавляем заголовок режима отладки
+      if (debugAdminMode) {
+        console.log('Отправка заголовка X-Debug-Admin-Mode: true');
+        config.headers['X-Debug-Admin-Mode'] = 'true';
+      }
+    
       if (accessToken) {
         config.headers.Authorization = `Bearer ${accessToken}`;
       }
+      
+      // Проверка и исправление URL на случай дублирования /api/v1
+      if (config.url && config.url.startsWith('/api/v1')) {
+        console.warn('Обнаружено дублирование префикса /api/v1 в URL запроса:', config.url);
+        config.url = config.url.replace('/api/v1', '');
+      }
+      
       return config;
     },
     error => Promise.reject(error)
@@ -57,101 +133,208 @@ export const AuthProvider = ({ children }) => {
     response => response,
     async error => {
       const originalRequest = error.config;
-      if (error.response?.status === 401 && !originalRequest._retry) {
-        if (isRefreshing) {
-          return new Promise(function(resolve, reject) {
-            setFailedQueue(prev => [...prev, { resolve, reject }])
-          })
-          .then(token => {
-            originalRequest.headers.Authorization = `Bearer ${token}`;
-            return apiClient(originalRequest);
-          })
-          .catch(err => {
-            return Promise.reject(err);
-          });
-        }
-
+      if (error.response?.status === 401 && refreshToken && !originalRequest._retry) {
         originalRequest._retry = true;
-        setIsRefreshing(true);
-
-        const localRefreshToken = localStorage.getItem('refreshToken'); // Получаем самый свежий refresh token
-        if (!localRefreshToken) {
-          setIsRefreshing(false);
-          logout(); // Если нет refresh token, выходим
-          return Promise.reject(error);
-        }
-
         try {
-          const { data } = await axios.post('/api/v1/auth/refresh', { refresh_token: localRefreshToken });
-          setTokens(data.access_token, data.refresh_token); // Обновляем оба токена
-          originalRequest.headers.Authorization = `Bearer ${data.access_token}`;
-          processQueue(null, data.access_token);
+          setRefreshLoading(true);
+          // Создаем отдельный экземпляр axios для запроса обновления токена
+          const refreshClient = axios.create({
+            baseURL: '/api/v1',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          });
+          
+          const response = await refreshClient.post('/auth/refresh', {
+            refresh_token: refreshToken,
+          });
+
+          const { access_token, refresh_token } = response.data;
+          
+          setTokens(access_token, refresh_token);
+          originalRequest.headers.Authorization = `Bearer ${access_token}`;
+          processQueue(null, access_token);
+          setRefreshLoading(false);
           return apiClient(originalRequest);
         } catch (refreshError) {
           processQueue(refreshError, null);
-          logout(); // Если обновление не удалось, выходим
+          logout();
           return Promise.reject(refreshError);
         } finally {
-          setIsRefreshing(false);
+          setRefreshLoading(false);
         }
       }
       return Promise.reject(error);
     }
   );
 
-  const fetchUser = useCallback(async () => {
-    if (localStorage.getItem('accessToken')) {
-      try {
-        const { data } = await apiClient.get('/users/me');
-        setUser(data);
-      } catch (error) {
-        console.error("Failed to fetch user", error);
-        // Не вызываем logout() здесь, чтобы дать шанс refresh-логике
-      }
+  const fetchUserData = async () => {
+    if (!accessToken) {
+      setLoading(false);
+      return;
     }
-    setLoading(false);
-  }, [apiClient]);
+    
+    try {
+      const response = await apiClient.get('/users/me');
+      const userData = response.data;
+      
+      // Сохраняем оригинальные роли пользователя для возможности возврата
+      localStorage.setItem('originalUserRoles', JSON.stringify(userData.roles || []));
+      
+      // Если включен режим админа для отладки, добавляем роль ADMIN
+      if (debugAdminMode && !userData.roles.includes('ADMIN')) {
+        userData.roles = [...userData.roles, 'ADMIN'];
+      }
+      
+      setUser(userData);
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+      if (error.response?.status === 401) {
+        logout();
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    fetchUser();
-    // eslint-disable-next-line
-  }, []); // Только при монтировании
+    fetchUserData();
+  }, [accessToken]);
+
+  // Периодическое обновление токена
+  useEffect(() => {
+    // Если нет refresh токена, не пытаемся обновлять
+    if (!refreshToken) return;
+
+    // Функция обновления токена
+    const refreshAccessToken = async () => {
+      try {
+        setRefreshLoading(true);
+        const refreshClient = axios.create({
+          baseURL: '/api/v1',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        const response = await refreshClient.post('/auth/refresh', {
+          refresh_token: refreshToken,
+        });
+
+        const { access_token, refresh_token } = response.data;
+        
+        if (access_token && refresh_token) {
+          setTokens(access_token, refresh_token);
+          console.log('Токен доступа успешно обновлен');
+        }
+      } catch (error) {
+        console.error('Ошибка при обновлении токена:', error);
+        // Если не удалось обновить токен, выходим из системы
+        if (error.response?.status === 401) {
+          logout();
+        }
+      } finally {
+        setRefreshLoading(false);
+      }
+    };
+
+    // Запускаем обновление при монтировании
+    refreshAccessToken();
+
+    // Запускаем обновление токена каждые 15 минут
+    const intervalId = setInterval(refreshAccessToken, 15 * 60 * 1000);
+
+    // Очистка интервала при размонтировании
+    return () => clearInterval(intervalId);
+  }, [refreshToken]);
 
   const login = async (email, password) => {
-    const response = await apiClient.post('/auth/login', { email, password });
-    setTokens(response.data.access_token, response.data.refresh_token);
-    await fetchUser(); // Загружаем пользователя после логина
-    return response.data;
+    setLoading(true);
+    try {
+      const response = await apiClient.post('/auth/login', {
+        email,
+        password,
+      });
+      
+      const { access_token, refresh_token } = response.data;
+      
+      if (!access_token || !refresh_token) {
+        throw new Error('Токены авторизации не получены');
+      }
+      
+      setTokens(access_token, refresh_token);
+      await fetchUserData();
+      
+      return response.data;
+    } catch (error) {
+      console.error('Login error:', error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
   };
 
   const register = async (userData) => {
-    return await apiClient.post('/auth/register', userData);
+    const response = await apiClient.post('/auth/register', userData);
+    login(userData.email, userData.password);
+    return response.data;
   };
 
-  const logout = useCallback(async () => {
-    const localRefreshToken = localStorage.getItem('refreshToken');
-    if (localRefreshToken) {
-      try {
-        // Предполагаем, что есть эндпоинт для отзыва токена
-        // Если его нет, этот запрос упадет, но logout на клиенте все равно произойдет
-        await apiClient.post('/auth/revoke_token', { refresh_token: localRefreshToken });
-        console.log("Refresh token revoked");
-      } catch (error) {
-        console.error("Failed to revoke refresh token", error.response?.data?.detail || error.message);
-        // Не блокируем выход пользователя, если отзыв не удался
-      }
-    }
+  const logout = () => {
+    setAccessToken(null);
+    setRefreshToken(null);
     setUser(null);
-    setTokens(null, null); 
-    setFailedQueue([]); 
-    navigate('/login'); 
-  }, [apiClient, navigate]); 
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('originalUserRoles');
+    setFailedQueue([]);
+    navigate('/login');
+  };
+
+  const value = {
+    accessToken,
+    refreshToken,
+    user,
+    loading,
+    refreshLoading,
+    apiClient,
+    login,
+    register,
+    logout,
+    fetchUserData,
+    debugAdminMode,
+    toggleDebugAdminMode
+  };
 
   return (
-    <AuthContext.Provider value={{ user, accessToken, login, register, logout, apiClient, loading }}>
+    <AuthContext.Provider value={value}>
+      {refreshLoading && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: '3px',
+          background: 'var(--color-accent)',
+          zIndex: 9999,
+          animation: 'loading 1.5s infinite'
+        }} />
+      )}
       {children}
     </AuthContext.Provider>
   );
 };
 
-export const useAuth = () => useContext(AuthContext);   
+export const useAuth = () => {
+  return useContext(AuthContext);
+};
+
+const style = document.createElement('style');
+style.textContent = `
+  @keyframes loading {
+    0% { width: 0; }
+    50% { width: 50%; }
+    100% { width: 100%; }
+  }
+`;
+document.head.appendChild(style);   

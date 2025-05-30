@@ -1,38 +1,74 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faFileAlt, faCalendarAlt, faTag, faBuilding, faInfoCircle } from '@fortawesome/free-solid-svg-icons';
 
 function DocumentItem({ document }) {
   // Ожидаем, что document - это объект, полученный от API (соответствующий DocumentPublic)
   return (
-    <div style={{
-      border: '1px solid #eee',
-      padding: '10px',
-      marginBottom: '8px',
-      borderRadius: '4px',
-      backgroundColor: '#fff' // Убираем условное выделение цветом
-    }}>
-      {/* Отображаем заголовок документа как ссылку */}
-      <strong>
-        <Link to={`/document/${document.id}`} style={{ textDecoration: 'underline', color: 'blue' }}>
+    <div className="document-card">
+      <div className="document-header">
+        <FontAwesomeIcon icon={faFileAlt} className="document-icon" />
+        <Link to={`/document/${document.id}`} className="document-link">
           {document.title}
         </Link>
-      </strong>
-      {/* Опционально: отображаем номер документа и дату утверждения */}
+      </div>
+      
+      {/* Номер документа и дата утверждения */}
       {(document.document_number || document.approval_date) && (
-        <p style={{ fontSize: '0.9em', color: '#666' }}>
-          {document.document_number && <span>Номер: {document.document_number}</span>}
-          {document.document_number && document.approval_date && <span>, </span>}
-          {document.approval_date && <span>Дата утверждения: {new Date(document.approval_date).toLocaleDateString()}</span>}
-        </p>
+        <div className="document-meta">
+          {document.document_number && (
+            <div className="meta-item">
+              <span className="meta-label">Номер:</span>
+              <span className="meta-value">{document.document_number}</span>
+            </div>
+          )}
+          
+          {document.approval_date && (
+            <div className="meta-item">
+              <FontAwesomeIcon icon={faCalendarAlt} className="meta-icon" />
+              <span className="meta-label">Дата утверждения:</span>
+              <span className="meta-value">{new Date(document.approval_date).toLocaleDateString()}</span>
+            </div>
+          )}
+        </div>
       )}
 
       {/* Дополнительная информация о документе */}
-      <div style={{ fontSize: '0.9em', color: '#666', marginTop: '8px' }}>
-        {document.status && <p><strong>Статус:</strong> {document.status}</p>}
-        {document.description && <p><strong>Описание:</strong> {document.description}</p>}
-        {document.department && <p><strong>Отдел:</strong> {document.department}</p>}
+      <div className="document-details">
+        {document.status && (
+          <div className="detail-item">
+            <FontAwesomeIcon icon={faInfoCircle} className="detail-icon" />
+            <span className="detail-label">Статус:</span>
+            <span className="detail-value">{document.status}</span>
+          </div>
+        )}
+        
+        {document.description && (
+          <div className="detail-item description">
+            <span className="detail-label">Описание:</span>
+            <span className="detail-value">{document.description}</span>
+          </div>
+        )}
+        
+        {document.department && (
+          <div className="detail-item">
+            <FontAwesomeIcon icon={faBuilding} className="detail-icon" />
+            <span className="detail-label">Отдел:</span>
+            <span className="detail-value">{document.department}</span>
+          </div>
+        )}
+        
         {document.tags && document.tags.length > 0 && (
-          <p><strong>Теги:</strong> {document.tags.join(', ')}</p>
+          <div className="detail-item tags">
+            <FontAwesomeIcon icon={faTag} className="detail-icon" />
+            <span className="detail-label">Теги:</span>
+            <div className="tags-container">
+              {document.tags.map((tag, index) => (
+                <span key={index} className="document-tag">{tag}</span>
+              ))}
+            </div>
+          </div>
         )}
       </div>
     </div>

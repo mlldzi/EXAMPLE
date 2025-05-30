@@ -2,14 +2,14 @@ from typing import Any, List, Dict
 from uuid import UUID
 import re
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app import crud
 from app.api.v1 import deps
 # Обновляем импорт, чтобы включить новые модели
 from app.models.term import Term, TermCreate, TermUpdate, TermPublic, TermConflictCheck, ConflictDetails, AnalyzedTermData
-from app.models.user import UserPublic
+from app.models.user import UserPublic, UserRole
 from app.models.term_document import TermUsageStatistic
 from app.models.document import DocumentPublic
 
@@ -195,6 +195,13 @@ async def update_term(
     current_user: UserPublic = Depends(deps.get_current_user),
 ) -> Any:
     """Обновить термин."""
+    # Проверяем права доступа - только администраторы и модераторы могут утверждать термины
+    if term_in.is_approved is not None and not any(role in current_user.roles for role in [UserRole.ADMIN, UserRole.MODERATOR]):
+        raise HTTPException(
+            status_code=403,
+            detail=f"У вас нет прав для утверждения термина. Требуется роль {UserRole.ADMIN} или {UserRole.MODERATOR}."
+        )
+        
     term_crud = crud.CRUDTerm(db)
     term = await term_crud.get_by_id(term_id=term_id)
     if not term:

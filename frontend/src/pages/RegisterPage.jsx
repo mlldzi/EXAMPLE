@@ -1,86 +1,130 @@
 import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { useNavigate, Link } from 'react-router-dom';
 
 function RegisterPage() {
-  const [email, setEmail] = useState('');
-  const [username, setUsername] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [password, setPassword] = useState('');
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+    full_name: '',
+    username: ''
+  });
   const [error, setError] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
+  const [loading, setLoading] = useState(false);
   const { register } = useAuth();
   const navigate = useNavigate();
 
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prevData => ({
+      ...prevData,
+      [name]: value
+    }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-    setSuccessMessage('');
+    
+    if (!formData.email || !formData.password) {
+      setError('Email и пароль обязательны');
+      return;
+    }
+    
+    if (formData.password.length < 8) {
+      setError('Пароль должен содержать не менее 8 символов');
+      return;
+    }
+
     try {
-      await register({ email, username, full_name: fullName, password });
-      setSuccessMessage('Регистрация прошла успешно! Теперь вы можете войти.');
-      // Очистка полей
-      setEmail('');
-      setUsername('');
-      setFullName('');
-      setPassword('');
-      // Можно сделать редирект на страницу входа через некоторое время
-      // setTimeout(() => navigate('/login'), 2000);
+      setError('');
+      setLoading(true);
+      await register(formData);
+      navigate('/dashboard');
     } catch (err) {
-      setError(err.response?.data?.detail || 'Ошибка регистрации. Пожалуйста, проверьте введенные данные.');
+      const errorMessage = err.response?.data?.detail || 'Ошибка при регистрации';
+      setError(Array.isArray(errorMessage) ? errorMessage[0]?.msg || 'Ошибка валидации' : errorMessage);
+      console.error('Registration error:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div>
-      <h2>Регистрация</h2>
+    <div className="auth-form-container fade-in">
+      <h1>Регистрация</h1>
+      
+      {error && (
+        <div className="error-message">
+          <i className="fas fa-exclamation-circle"></i> {error}
+        </div>
+      )}
+      
       <form onSubmit={handleSubmit}>
-        {error && <p className="error">{error}</p>}
-        {successMessage && <p style={{ color: 'green' }}>{successMessage}</p>}
-        <div>
-          <label htmlFor="email">Email:</label>
+        <div className="form-group">
+          <label htmlFor="email" className="form-label">Email *</label>
           <input
             type="email"
             id="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            name="email"
+            value={formData.email}
+            onChange={handleChange}
+            placeholder="Введите email"
             required
           />
         </div>
-        <div>
-          <label htmlFor="username">Имя пользователя (username):</label>
-          <input
-            type="text"
-            id="username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            required
-          />
-        </div>
-        <div>
-          <label htmlFor="fullName">Полное имя:</label>
-          <input
-            type="text"
-            id="fullName"
-            value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
-            required
-          />
-        </div>
-        <div>
-          <label htmlFor="password">Пароль:</label>
+        
+        <div className="form-group">
+          <label htmlFor="password" className="form-label">Пароль *</label>
           <input
             type="password"
             id="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            name="password"
+            value={formData.password}
+            onChange={handleChange}
+            placeholder="Минимум 8 символов"
             required
           />
         </div>
-        <button type="submit">Зарегистрироваться</button>
+        
+        <div className="form-group">
+          <label htmlFor="username" className="form-label">Имя пользователя</label>
+          <input
+            type="text"
+            id="username"
+            name="username"
+            value={formData.username}
+            onChange={handleChange}
+            placeholder="Введите имя пользователя"
+          />
+        </div>
+        
+        <div className="form-group">
+          <label htmlFor="full_name" className="form-label">Полное имя</label>
+          <input
+            type="text"
+            id="full_name"
+            name="full_name"
+            value={formData.full_name}
+            onChange={handleChange}
+            placeholder="Введите полное имя"
+          />
+        </div>
+        
+        <button 
+          type="submit" 
+          className="btn btn-primary form-submit" 
+          disabled={loading}
+        >
+          {loading ? (
+            <>
+              <i className="fas fa-spinner fa-spin"></i> Регистрация...
+            </>
+          ) : 'Зарегистрироваться'}
+        </button>
       </form>
-      <p className="auth-links">
-        Уже есть аккаунт? <Link to="/login">Войти</Link>
+      
+      <p className="auth-switch" style={{ marginTop: '1.5rem', textAlign: 'center' }}>
+        Уже есть аккаунт? <Link to="/login" style={{ color: 'var(--color-accent)' }}>Войти</Link>
       </p>
     </div>
   );
