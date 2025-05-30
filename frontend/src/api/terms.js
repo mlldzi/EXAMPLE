@@ -83,9 +83,16 @@ const termsApi = {
   },
 
   // Проверка конфликта термина
-  checkTermConflict: async (apiClient, termData) => {
+  checkTermConflict: async (apiClient, termData, options = {}) => {
     try {
-      const response = await apiClient.post('/terms/check-conflict', termData);
+      // Параметр save_to_history указывает, нужно ли сохранять текущее определение в историю 
+      // при разрешении конфликта в пользу нового определения
+      const data = {
+        ...termData,
+        save_to_history: options.save_to_history || false
+      };
+      
+      const response = await apiClient.post('/terms/check-conflict', data);
       return response.data;
     } catch (error) {
       console.error('Error checking term conflict:', error);
@@ -94,9 +101,17 @@ const termsApi = {
   },
 
   // Массовое сохранение терминов
-  bulkSaveTerms: async (apiClient, termsData) => {
+  bulkSaveTerms: async (apiClient, termsData, options = {}) => {
     try {
-      const response = await apiClient.post('/terms/bulk-save', termsData);
+      // Бэкенд API ожидает получить просто массив терминов
+      // Опции передаем через параметры запроса (query params)
+      const params = {
+        save_history: options.save_history !== undefined ? options.save_history : true,
+        replace_definitions: options.replace_definitions !== undefined ? options.replace_definitions : true,
+        update_existing: options.update_existing !== undefined ? options.update_existing : false
+      };
+      
+      const response = await apiClient.post('/terms/bulk-save', termsData, { params });
       return response.data;
     } catch (error) {
       console.error('Error bulk saving terms:', error);

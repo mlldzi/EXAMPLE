@@ -34,13 +34,19 @@ async def create_term(
 @router.post("/bulk-save", response_model=Dict[str, Any])
 async def bulk_save_terms(
     terms_in: List[AnalyzedTermData],
+    save_history: bool = True,
+    replace_definitions: bool = True,
+    update_existing: bool = False,  # Новый параметр для обновления существующих терминов
     db: AsyncIOMotorDatabase = Depends(deps.get_db),
     current_user: UserPublic = Depends(deps.get_current_user),
 ) -> Dict[str, Any]:
     """Сохранить список терминов, полученных после анализа документа."""
     term_crud = crud.CRUDTerm(db)
     saved_count = 0
+    updated_count = 0  # Счетчик обновленных терминов
     errors = []
+    saved_terms = []  # Список созданных терминов с полными данными
+    updated_terms = []  # Список обновленных терминов
 
     for term_data in terms_in:
         try:
@@ -48,9 +54,25 @@ async def bulk_save_terms(
             existing_term = await term_crud.get_by_name_case_insensitive(name=term_data.name)
             
             if existing_term:
-                # TODO: Обработка конфликта - что делать, если термин уже существует?
-                # Сейчас просто пропускаем
-                errors.append({"name": term_data.name, "detail": "Термин с таким именем уже существует"})
+                if update_existing:
+                    # Обновляем существующий термин, если разрешено
+                    term_update_data = TermUpdate(
+                        definition=term_data.definition,
+                        # Сохраняем историю только если указан параметр
+                        save_definition_history=save_history
+                    )
+                    
+                    updated_term = await term_crud.update(
+                        term_id=existing_term.id, 
+                        term_update=term_update_data,
+                        user_id=current_user.id
+                    )
+                    
+                    updated_count += 1
+                    updated_terms.append(updated_term)
+                else:
+                    # Если обновление не разрешено, добавляем в ошибки
+                    errors.append({"name": term_data.name, "detail": "Термин с таким именем уже существует"})
                 continue
             
             # Создаем объект TermCreate для использования с CRUD
@@ -62,13 +84,20 @@ async def bulk_save_terms(
             )
             
             # Создаем термин
-            await term_crud.create(term_in=term_create_data, user_id=current_user.id)
+            new_term = await term_crud.create(term_in=term_create_data, user_id=current_user.id)
             saved_count += 1
+            saved_terms.append(new_term)
             
         except Exception as e:
             errors.append({"name": term_data.name, "detail": str(e)})
 
-    return {"saved_count": saved_count, "errors": errors}
+    return {
+        "saved_count": saved_count, 
+        "updated_count": updated_count,
+        "errors": errors,
+        "saved_terms": saved_terms,
+        "updated_terms": updated_terms
+    }
 
 @router.post("/check-conflict", response_model=List[ConflictDetails])
 async def check_term_conflict(
