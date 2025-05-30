@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faSearch, faBook } from '@fortawesome/free-solid-svg-icons';
 import TermItem from '../components/TermItem';
 import { useAuth } from '../contexts/AuthContext';
 import termsApi from '../api/terms';
@@ -61,7 +63,7 @@ function SearchPage() {
               className="search-input"
             />
             <button type="submit" className="btn btn-primary search-btn">
-              <i className="fas fa-search"></i>
+              <FontAwesomeIcon icon={faSearch} />
             </button>
           </div>
         </form>
@@ -85,13 +87,13 @@ function SearchPage() {
             </>
           ) : searchQuery ? (
             <div className="no-results">
-              <i className="fas fa-search fa-4x" style={{ color: 'var(--color-gray-300)', marginBottom: '1rem' }}></i>
+              <FontAwesomeIcon icon={faSearch} size="4x" style={{ color: 'var(--color-gray-300)', marginBottom: '1rem' }} />
               <h3>Ничего не найдено</h3>
               <p>Попробуйте изменить запрос или добавить новый термин</p>
             </div>
           ) : (
             <div className="no-results">
-              <i className="fas fa-book fa-4x" style={{ color: 'var(--color-gray-300)', marginBottom: '1rem' }}></i>
+              <FontAwesomeIcon icon={faBook} size="4x" style={{ color: 'var(--color-gray-300)', marginBottom: '1rem' }} />
               <h3>Термины не найдены</h3>
               <p>В системе пока нет добавленных терминов</p>
             </div>

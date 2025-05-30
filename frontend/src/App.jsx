@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import LoginPage from './pages/LoginPage';
@@ -8,6 +8,10 @@ import SearchPage from './pages/SearchPage';
 import TermPage from './pages/TermPage';
 import DocumentAnalysisPage from './pages/DocumentAnalysisPage';
 import DocumentPage from './pages/DocumentPage';
+import Modal from './components/Modal';
+import CreateTermForm from './components/CreateTermForm';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faPlus } from '@fortawesome/free-solid-svg-icons';
 
 // Компонент для защиты роутов
 const ProtectedRoute = ({ children }) => {
@@ -78,8 +82,26 @@ function Navigation() {
 }
 
 function AppContent() {
+  const { user, apiClient } = useAuth();
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  const openModal = () => {
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+  };
+
+  const handleTermCreated = (newTerm) => {
+    // Закрываем модальное окно после создания термина
+    closeModal();
+    // Перенаправляем на страницу созданного термина
+    window.location.href = `/term/${newTerm.id}`;
+  };
+  
   return (
-    <>
+    <div className="app-wrapper">
       <Navigation />
       <div className="container">
         <Routes>
@@ -95,7 +117,22 @@ function AppContent() {
           <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
         </Routes>
       </div>
-    </>
+      
+      {/* Глобальные компоненты */}
+      {user && (
+        <button className="add-term-button" onClick={openModal} title="Добавить новый термин">
+          <FontAwesomeIcon icon={faPlus} />
+        </button>
+      )}
+      
+      <Modal isOpen={isModalOpen} onClose={closeModal} title="Создание нового термина">
+        <CreateTermForm 
+          onSave={handleTermCreated} 
+          onCancel={closeModal}
+          apiClient={apiClient}
+        />
+      </Modal>
+    </div>
   );
 }
 

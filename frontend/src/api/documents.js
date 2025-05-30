@@ -1,5 +1,8 @@
-const getDocuments = async (apiClient, params) => {
+const getDocuments = async (apiClient, skip = 0, limit = 100, query = '') => {
   try {
+    const params = { skip, limit };
+    if (query) params.query = query;
+    
     const response = await apiClient.get('/documents/', { params });
     return response.data;
   } catch (error) {
