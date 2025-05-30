@@ -54,7 +54,7 @@ struct ErrorView: View {
     }
 }
 
-struct EmptyStateView: View {
+struct CommonEmptyStateView: View {
     let title: String
     let message: String
     let iconName: String

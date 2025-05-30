@@ -34,6 +34,20 @@ class AuthService: ObservableObject {
         }
     }
     
+    // Публичный метод для загрузки сохраненного пользователя
+    public func loadStoredUser() {
+        loadTokensFromStorage()
+        
+        if apiClient.isAuthenticated {
+            fetchCurrentUser()
+                .sink(
+                    receiveCompletion: { _ in },
+                    receiveValue: { _ in }
+                )
+                .store(in: &self.cancellables)
+        }
+    }
+    
     private func loadTokensFromStorage() {
         if let accessToken = UserDefaults.standard.string(forKey: "accessToken"),
            let refreshToken = UserDefaults.standard.string(forKey: "refreshToken"),

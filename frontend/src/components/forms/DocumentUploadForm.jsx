@@ -51,7 +51,7 @@ function DocumentUploadForm({ onFileUpload, loading }) {
               <FontAwesomeIcon icon={faUpload} /> Загрузить для анализа
             </>
           )}
-        </button>
+      </button>
       </div>
 
       {/* Отображение имени выбранного файла */}

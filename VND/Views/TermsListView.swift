@@ -58,7 +58,7 @@ struct TermsListView: View {
                     } else if let errorMessage = errorMessage, terms.isEmpty {
                         ErrorView(message: errorMessage, retryAction: loadTerms)
                     } else if terms.isEmpty {
-                        EmptyStateView(
+                        CommonEmptyStateView(
                             title: "Термины не найдены",
                             message: "В глоссарии нет терминов, соответствующих поисковому запросу",
                             iconName: "magnifyingglass"
