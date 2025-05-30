@@ -41,6 +41,24 @@ const createDocument = async (apiClient, documentData) => {
   }
 };
 
+const analyzeDocument = async (apiClient, file) => {
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const response = await apiClient.post('/documents/analyze', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    
+    return response.data;
+  } catch (error) {
+    console.error('Error analyzing document:', error);
+    throw error;
+  }
+};
+
 // Добавьте другие функции для CRUD операций с документами здесь при необходимости
 
 export default {
@@ -48,5 +66,6 @@ export default {
   getDocumentById,
   getTermsForDocument,
   createDocument,
+  analyzeDocument,
   // Экспортируйте другие функции здесь
 }; 

@@ -36,41 +36,54 @@ async def close_mongo_connection():
         print("MongoDB connection closed")
 
 async def create_indexes(db: AsyncIOMotorDatabase):
-    # User collection indexes
-    await db[USERS_COLLECTION].create_index("email", unique=True)
-    await db[USERS_COLLECTION].create_index("username", unique=True, sparse=True) # Если username опционален
-    await db[USERS_COLLECTION].create_index("id", unique=True)
-    
-    # Profile collection indexes (если будет)
-    # await db[PROFILES_COLLECTION].create_index("user_id", unique=True)
+    try:
+        # Сначала удаляем существующие индексы, которые могут вызывать проблемы
+        await db[USERS_COLLECTION].drop_indexes()
+        await db[TERMS_COLLECTION].drop_indexes()
+        await db[DOCUMENTS_COLLECTION].drop_indexes()
+        await db[TERM_DOCUMENT_RELATIONS_COLLECTION].drop_indexes()
+        await db[REFRESH_TOKENS_COLLECTION].drop_indexes()
+        await db[TOKEN_BLACKLIST_COLLECTION].drop_indexes()
+        
+        print("Existing indexes dropped")
+        
+        # User collection indexes
+        await db[USERS_COLLECTION].create_index("email", unique=True)
+        await db[USERS_COLLECTION].create_index("username", unique=True, sparse=True) # Если username опционален
+        await db[USERS_COLLECTION].create_index("id", unique=True, sparse=True)  # Добавлен sparse=True для пропуска null значений
+        
+        # Profile collection indexes (если будет)
+        # await db[PROFILES_COLLECTION].create_index("user_id", unique=True)
 
-    # Refresh token indexes
-    await db[REFRESH_TOKENS_COLLECTION].create_index("refresh_token", unique=True)
-    await db[REFRESH_TOKENS_COLLECTION].create_index("user_id")
-    await db[REFRESH_TOKENS_COLLECTION].create_index("expires_at")
-    
-    # Token blacklist indexes
-    await db[TOKEN_BLACKLIST_COLLECTION].create_index("token", unique=True)
-    await db[TOKEN_BLACKLIST_COLLECTION].create_index("expires_at")
-    
-    # Индексы для коллекции терминов
-    await db[TERMS_COLLECTION].create_index("id", unique=True)
-    await db[TERMS_COLLECTION].create_index("name", unique=True)
-    await db[TERMS_COLLECTION].create_index("tags")
-    
-    # Индексы для коллекции документов
-    await db[DOCUMENTS_COLLECTION].create_index("id", unique=True)
-    await db[DOCUMENTS_COLLECTION].create_index("document_number", unique=True)
-    await db[DOCUMENTS_COLLECTION].create_index("title")
-    await db[DOCUMENTS_COLLECTION].create_index("status")
-    await db[DOCUMENTS_COLLECTION].create_index("department")
-    await db[DOCUMENTS_COLLECTION].create_index("tags")
-    
-    # Индексы для коллекции связей термин-документ
-    await db[TERM_DOCUMENT_RELATIONS_COLLECTION].create_index("id", unique=True)
-    await db[TERM_DOCUMENT_RELATIONS_COLLECTION].create_index("term_id")
-    await db[TERM_DOCUMENT_RELATIONS_COLLECTION].create_index("document_id")
-    await db[TERM_DOCUMENT_RELATIONS_COLLECTION].create_index([("term_id", 1), ("document_id", 1)], unique=True)
-    await db[TERM_DOCUMENT_RELATIONS_COLLECTION].create_index("conflict_status")
-    
-    print("Indexes created successfully for glossary app") 
+        # Refresh token indexes
+        await db[REFRESH_TOKENS_COLLECTION].create_index("refresh_token", unique=True)
+        await db[REFRESH_TOKENS_COLLECTION].create_index("user_id")
+        await db[REFRESH_TOKENS_COLLECTION].create_index("expires_at")
+        
+        # Token blacklist indexes
+        await db[TOKEN_BLACKLIST_COLLECTION].create_index("token", unique=True)
+        await db[TOKEN_BLACKLIST_COLLECTION].create_index("expires_at")
+        
+        # Индексы для коллекции терминов
+        await db[TERMS_COLLECTION].create_index("id", unique=True, sparse=True)  # Добавлен sparse=True
+        await db[TERMS_COLLECTION].create_index("name", unique=True)
+        await db[TERMS_COLLECTION].create_index("tags")
+        
+        # Индексы для коллекции документов
+        await db[DOCUMENTS_COLLECTION].create_index("id", unique=True, sparse=True)  # Добавлен sparse=True
+        await db[DOCUMENTS_COLLECTION].create_index("document_number", unique=True, sparse=True)  # Добавлен sparse=True
+        await db[DOCUMENTS_COLLECTION].create_index("title")
+        await db[DOCUMENTS_COLLECTION].create_index("status")
+        await db[DOCUMENTS_COLLECTION].create_index("department")
+        await db[DOCUMENTS_COLLECTION].create_index("tags")
+        
+        # Индексы для коллекции связей термин-документ
+        await db[TERM_DOCUMENT_RELATIONS_COLLECTION].create_index("id", unique=True, sparse=True)  # Добавлен sparse=True
+        await db[TERM_DOCUMENT_RELATIONS_COLLECTION].create_index("term_id")
+        await db[TERM_DOCUMENT_RELATIONS_COLLECTION].create_index("document_id")
+        await db[TERM_DOCUMENT_RELATIONS_COLLECTION].create_index([("term_id", 1), ("document_id", 1)], unique=True)
+        await db[TERM_DOCUMENT_RELATIONS_COLLECTION].create_index("conflict_status")
+        
+        print("Indexes created successfully for glossary app")
+    except Exception as e:
+        print(f"Error creating indexes: {str(e)}") 

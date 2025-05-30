@@ -164,25 +164,52 @@ async def analyze_document(
 ) -> Any:
     """Анализирует загруженный документ и извлекает термины и их определения."""
 
-    # Чтение содержимого файла (для будущей реализации парсинга)
-    # content = await file.read()
-
-    # Здесь будет логика парсинга документа и извлечения терминов
-    # Пока возвращаем заглушечные данные в требуемом формате
-    analyzed_data = [
-        {
-            "term": "Заглушка Термин 1",
-            "definition": "Заглушка Определение 1",
-            "source": "Заглушка Источник 1",
-            "year": "2023"
-        },
-        {
-            "term": "Заглушка Термин 2",
-            "definition": "Заглушка Определение 2",
-            "source": "Заглушка Источник 2",
-            "year": "2024"
-        }
-        # Добавьте больше заглушек по необходимости
-    ]
-
-    return analyzed_data
+    import os
+    from uuid import uuid4
+    
+    from app.utils.pdf_parser import extract_terms_from_pdf
+    
+    # Сохраняем файл во временную директорию
+    file_extension = os.path.splitext(file.filename)[1]
+    temp_file_name = f"{uuid4()}{file_extension}"
+    file_path = os.path.join("files", temp_file_name)
+    
+    # Создаем директорию, если она не существует
+    os.makedirs("files", exist_ok=True)
+    
+    # Читаем и сохраняем содержимое файла
+    content = await file.read()
+    with open(file_path, "wb") as f:
+        f.write(content)
+    
+    try:
+        # Извлекаем термины и определения из PDF
+        term_pairs = extract_terms_from_pdf(file_path)
+        
+        # Преобразуем в требуемый формат API
+        source_name = os.path.splitext(file.filename)[0]
+        
+        analyzed_data = [
+            {
+                "term": term,
+                "definition": definition,
+                "source": source_name,
+                "year": "" # Год можно будет добавить при сохранении документа
+            }
+            for term, definition in term_pairs
+        ]
+        
+        # Если ничего не нашли, вернем пустой список
+        if not analyzed_data:
+            return []
+            
+        return analyzed_data
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ошибка при анализе документа: {str(e)}")
+    finally:
+        # Удаляем временный файл
+        try:
+            os.remove(file_path)
+        except:
+            pass

@@ -49,61 +49,16 @@ function DocumentAnalysisPage() {
       }
 
       // Вызываем API для анализа документа
-      // NOTE: Эта часть будет закомментирована, пока нет реального парсера/API
-      // const results = await documentsApi.analyzeDocument(apiClient, file);
-      // setAnalysisItems(results);
+      const results = await documentsApi.analyzeDocument(apiClient, file);
+      setAnalysisItems(results);
 
-      // ### Заглушечные данные для фронтенда ###
-      // Используем заглушечные данные, пока нет реального API вызова
-      const dummyResults = [
-          {
-              "term": "Заглушка Термин 1",
-              "definition": "Заглушка Определение 1",
-              "year": "2023"
-          },
-          {
-              "term": "Заглушка Термин 2",
-              "definition": "Заглушка Определение 2",
-              "year": "2024"
-          },
-          {
-            "term": "Заглушка Термин 3 (без года)",
-            "definition": "Заглушка Определение 3 (без года)",
-            // Нет года для проверки
-          }
-      ];
-      setAnalysisItems(dummyResults);
-      // ### Конец заглушечных данных ###
-
-      // Запускаем проверку конфликтов для каждого загруженного термина
-      const conflictChecks = dummyResults.map(async (item, index) => {
-        try {
-          // Передаем только нужные для проверки поля
-          const conflicts = await termsApi.checkTermConflict(apiClient, {
-            name: item.term,
-            definition: item.definition,
-            year: item.year
-          });
-          
-          if (conflicts && conflicts.length > 0) {
-            // Сохраняем конфликты, привязывая их к индексу элемента
-            setTermConflicts(prevConflicts => ({
-              ...prevConflicts,
-              [index]: conflicts
-            }));
-          }
-        } catch (conflictErr) {
-          console.error(`Error checking conflict for item ${index}:`, conflictErr);
-          // Обработка ошибок проверки конфликтов, возможно, установка флага ошибки для этого элемента
-        }
-      });
-
-      // Ждем завершения всех проверок конфликтов (опционально)
-      await Promise.all(conflictChecks);
-
+      // Если не получили результатов анализа
+      if (!results || results.length === 0) {
+        setError('Не удалось извлечь термины из документа. Убедитесь, что документ содержит глоссарий или раздел с терминами и определениями.');
+      }
     } catch (err) {
-      setError('Ошибка при анализе документа.');
       console.error('Error analyzing document:', err);
+      setError('Произошла ошибка при анализе документа: ' + (err.message || 'Неизвестная ошибка'));
     } finally {
       setLoading(false);
     }
